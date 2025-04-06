@@ -4,9 +4,9 @@ setlocal enabledelayedexpansion
 REM Set paths
 set "GDAL_TRANSLATE=C:\Program Files\QGIS 3.40.4\bin\gdal_translate.exe"
 set "GDAL_WARP=C:\Program Files\QGIS 3.40.4\bin\gdalwarp.exe"
-set "PDSI_DIR=C:\Users\rcavalh\Documents\Camcore25\dados_empresas\Bracell\dados_cliamaticos\terraclimate\PDSI"
+set "PDSI_DIR=ReplaceWithYourPath\PDSI"
 set "TARGET_RES=0.02"
-set "CUTLINE_PATH=C:\Users\rcavalh\mlogasu_hyarram\camcorecoordspolyfile\cacmcorecoordspolyfile.shp"
+set "CUTLINE_PATH=ReplaceWithYourPath\camcorecoordspolyfile\cacmcorecoordspolyfile.shp"
 set "OUTPUT_DIR=%PDSI_DIR%\rasters"
 
 REM Create output directory if it doesn't exist

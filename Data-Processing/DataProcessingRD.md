@@ -4,7 +4,7 @@
 - All rasters in 4326 CRS after resampling
 - All raster nodata is -9999.0 exept terraclim (-32768)
 - All global rasters are clipped to Bbox (GEE): ee.Geometry.BBox(-94.187, -39.020, 37.062, 18.229)
-- Terraclim netcdf to raster conversion with resampling using scripts for each variable in netcdf2raster folder
+- Terraclim netcdf to raster conversion with resampling using scripts for each variable in netcdf2raster folder. (Replace your own paths to gdal_translate.exe, gdal_warp.exe)
 - NASA Power netcdf to raster using python script convert_netcdf_raster.py 
 
 ![alt text](./bbox.png)
