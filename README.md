@@ -43,26 +43,26 @@ The Geospatial Database project processes geographical data through several stag
 6. **Create a Pull Request**
    - Go to repository on GitHub
    - Click "Pull requests" → "New pull request"
-   - Select your branch to compare with main
+   - Select your branch to compare with master
    - Add title and description
    - Create pull request
 
 7. **Review and merge**
    - Review others' code 
-   - Once approved, merge PR into main branch
+   - Once approved, merge PR into master branch
 
 ## Staying Updated
 
-8. **Update local main branch**
+8. **Update local master branch**
    ```bash
-   git checkout main
-   git pull origin main
+   git checkout master
+   git pull origin master
    ```
 
-9. **Update feature branch with changes from main**
+9. **Update feature branch with changes from master**
    ```bash
    git checkout Feature-Name
-   git merge main
+   git merge master
    ```
 
 ## Handling Conflicts

@@ -38,5 +38,5 @@ ds_region = ds[var].sel(
 ### 2.1. SoilGrids: 
 
 ---
-- Downloaded all soilgrids global rasters from [https://www.isric.org/instruction-wms](https://www.isric.org/instruction-wms)
+- Downloaded all soilgrids global rasters from [https://files.isric.org/soilgrids/latest/data_aggregated/1000m/](https://files.isric.org/soilgrids/latest/data_aggregated/1000m/)
 
