@@ -27,6 +27,23 @@ ds_region = ds[var].sel(
 ---
 - Downloaded SoilGrids and make covariables for wordlcim and soil grids together 
 
+### 1.4. DownloadMODIS_GEE:
+---
+- MOD16A2 downloaded from Google Earth Engine on Google Colab.
+
+### 1.5. DownloadCHIRPS_GEE:
+---
+- CHIRPS downloaded from Google Earth Engine on Google Colab.
+
+### 1.6. DownloadERA5Land_GEE:
+---
+- ERA5Land downloaded from Google Earth Engine on Google Colab.
+
+### 1.7. DownloadSPEIbase_GEE:
+---
+- SPEIbase downloaded from Google Earth Engine on Google Colab.
+
+
 ## 2. Download Process 
 
 ### 2.1. Terraclim: 
@@ -35,8 +52,9 @@ ds_region = ds[var].sel(
 - Downloaded all Terraclim NetCDFs from [https://climate.northwestknowledge.net/TERRACLIMATE/index_directDownloads.php](https://climate.northwestknowledge.net/TERRACLIMATE/index_directDownloads.php)
 
 
-### 2.1. SoilGrids: 
+### 2.2. SoilGrids: 
 
 ---
-- Downloaded all soilgrids global rasters from [https://files.isric.org/soilgrids/latest/data_aggregated/1000m/](https://files.isric.org/soilgrids/latest/data_aggregated/1000m/)
+- Downloaded all soilgrids global rasters from [https://www.isric.org/instruction-wms](https://www.isric.org/instruction-wms)
+
 
