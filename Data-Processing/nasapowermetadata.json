@@ -1,0 +1,992 @@
+[
+    {
+        "file_name": "AIRMASS.nc",
+        "variables": {
+            "AIRMASS": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "Air Mass according to Perez et al. 1990.",
+                "long_name": "Air Mass",
+                "significant_digits": "2",
+                "standard_name": "Air_Mass",
+                "status": "official",
+                "units": "dimensionless",
+                "valid_max": 31.73,
+                "valid_min": 1.0
+            }
+        }
+    },
+    {
+        "file_name": "ALLSKY_KT.nc",
+        "variables": {
+            "ALLSKY_KT": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: compute",
+                "definition": "A fraction representing clearness of the atmosphere; the all sky insolation that is transmitted through the atmosphere to strike the surface of the earth divided by the average of top of the atmosphere total solar irradiance incident.",
+                "long_name": "All Sky Insolation Clearness Index",
+                "significant_digits": "2",
+                "standard_name": "All_Sky_Insolation_Clearness_Index",
+                "status": "official",
+                "units": "dimensionless",
+                "valid_max": 1.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "ALLSKY_NKT.nc",
+        "variables": {
+            "ALLSKY_NKT": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: compute",
+                "definition": "The average zenith angle-independent expression of the all sky insolation clearness index.",
+                "long_name": "All Sky Normalized Insolation Clearness Index",
+                "significant_digits": "2",
+                "standard_name": "All_Sky_Normalized_Insolation_Clearness_Index",
+                "status": "official",
+                "units": "dimensionless",
+                "valid_max": 1.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "ALLSKY_SFC_LW_DWN.nc",
+        "variables": {
+            "ALLSKY_SFC_LW_DWN": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The downward thermal infrared irradiance under all sky conditions reaching a horizontal plane at the surface of the earth. Also known as Horizontal Infrared Radiation Intensity from the Sky.",
+                "long_name": "All Sky Surface Longwave Downward Irradiance",
+                "significant_digits": "2",
+                "standard_name": "All_Sky_Surface_Longwave_Downward_Irradiance",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "ALLSKY_SFC_LW_UP.nc",
+        "variables": {
+            "ALLSKY_SFC_LW_UP": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The upward thermal infrared irradiance under all sky conditions.",
+                "long_name": "All Sky Surface Longwave Upward Irradiance",
+                "significant_digits": "2",
+                "standard_name": "All_Sky_Surface_Longwave_Upward_Irradiance",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "ALLSKY_SFC_PAR_DIFF.nc",
+        "variables": {
+            "ALLSKY_SFC_PAR_DIFF": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The diffuse (scattered from original direct path by molecules or particles) Photosynthetically Active Radiation (PAR) solar irradiance incident on a horizontal plane at the surface of the earth under all sky conditions.",
+                "long_name": "All Sky Surface Diffuse PAR",
+                "significant_digits": "2",
+                "standard_name": "All_Sky_Surface_Diffuse_PAR",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "ALLSKY_SFC_PAR_DIRH.nc",
+        "variables": {
+            "ALLSKY_SFC_PAR_DIRH": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The Photosynthetically Active Radiation (PAR) solar irradiance incident on a horizontal plane at the surface of the earth under all sky conditions.",
+                "long_name": "All Sky Surface Direct Horizontal PAR",
+                "significant_digits": "2",
+                "standard_name": "All_Sky_Surface_Direct_Horizontal_PAR",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "ALLSKY_SFC_PAR_TOT.nc",
+        "variables": {
+            "ALLSKY_SFC_PAR_TOT": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The total (direct plus diffuse) Photosynthetically Active Radiation (PAR) incident on a horizontal plane at the surface of the earth under all sky conditions.",
+                "long_name": "All Sky Surface Total PAR",
+                "significant_digits": "2",
+                "standard_name": "All_Sky_Surface_Total_PAR",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "ALLSKY_SFC_SW_DIFF.nc",
+        "variables": {
+            "ALLSKY_SFC_SW_DIFF": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The diffuse (scattered from original direct path by molecules or particles) solar irradiance incident on a horizontal plane at the surface of the earth under all sky conditions.",
+                "long_name": "All Sky Surface Shortwave Diffuse Irradiance",
+                "significant_digits": "2",
+                "standard_name": "All_Sky_Surface_Shortwave_Diffuse_Irradiance",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "ALLSKY_SFC_SW_DIRH.nc",
+        "variables": {
+            "ALLSKY_SFC_SW_DIRH": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The solar irradiance incident on a horizontal plane at the surface of the earth under all sky conditions.",
+                "long_name": "All Sky Surface Shortwave Direct Horizontal Irradiance",
+                "significant_digits": "2",
+                "standard_name": "All_Sky_Surface_Shortwave_Direct_Horizontal_Irradiance",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "ALLSKY_SFC_SW_DNI.nc",
+        "variables": {
+            "ALLSKY_SFC_SW_DNI": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The direct solar irradiance incident to a horizontal plane normal (perpendicular) to the direction of the sun's position under all sky conditions.",
+                "long_name": "All Sky Surface Shortwave Downward Direct Normal Irradiance",
+                "significant_digits": "2",
+                "standard_name": "All_Sky_Surface_Shortwave_Downward_Direct_Normal_Irradiance",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "ALLSKY_SFC_SW_DWN.nc",
+        "variables": {
+            "ALLSKY_SFC_SW_DWN": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The total solar irradiance incident (direct plus diffuse) on a horizontal plane at the surface of the earth under all sky conditions. An alternative term for the total solar irradiance is the \"Global Horizontal Irradiance\" or GHI.",
+                "long_name": "All Sky Surface Shortwave Downward Irradiance",
+                "significant_digits": "2",
+                "standard_name": "All_Sky_Surface_Shortwave_Downward_Irradiance",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "ALLSKY_SFC_SW_UP.nc",
+        "variables": {
+            "ALLSKY_SFC_SW_UP": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The upward shortwave irradiance under all sky conditions.",
+                "long_name": "All Sky Surface Shortwave Upward Irradiance",
+                "significant_digits": "2",
+                "standard_name": "All_Sky_Surface_Shortwave_Upward_Irradiance",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "ALLSKY_SFC_UVA.nc",
+        "variables": {
+            "ALLSKY_SFC_UVA": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The ultraviolet A (UVA 315nm-400nm) irradiance under all sky conditions.",
+                "long_name": "All Sky Surface UVA Irradiance",
+                "significant_digits": "2",
+                "standard_name": "All_Sky_Surface_UVA_Irradiance",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "ALLSKY_SFC_UVB.nc",
+        "variables": {
+            "ALLSKY_SFC_UVB": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The ultraviolet B (UVB 280nm-315nm) irradiance under all sky conditions.",
+                "long_name": "All Sky Surface UVB Irradiance",
+                "significant_digits": "2",
+                "standard_name": "All_Sky_Surface_UVB_Irradiance",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "ALLSKY_SFC_UV_INDEX.nc",
+        "variables": {
+            "ALLSKY_SFC_UV_INDEX": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The ultraviolet radiation exposure index.",
+                "long_name": "All Sky Surface UV Index",
+                "significant_digits": "2",
+                "standard_name": "All_Sky_Surface_UV_Index",
+                "status": "official",
+                "units": "W m-2 x 40",
+                "valid_max": 30.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "ALLSKY_SRF_ALB.nc",
+        "variables": {
+            "ALLSKY_SRF_ALB": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The all sky rate of reflectivity of the earth's surface; the ratio of the solar energy reflected by the surface of the earth compared to the total solar energy incident reaching the surface of the earth.",
+                "long_name": "All Sky Surface Albedo",
+                "significant_digits": "2",
+                "standard_name": "All_Sky_Surface_Albedo",
+                "status": "official",
+                "units": "dimensionless",
+                "valid_max": 1.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "AOD_55.nc",
+        "variables": {
+            "AOD_55": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The optical thickness at 0.55 um measured vertically; the component of the atmosphere to quantify the removal of radiant energy from an incident beam.",
+                "long_name": "Aerosol Optical Depth 55",
+                "significant_digits": "2",
+                "standard_name": "Aerosol_Optical_Depth_55",
+                "status": "official",
+                "units": "dimensionless",
+                "valid_max": 10.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "AOD_55_ADJ.nc",
+        "variables": {
+            "AOD_55_ADJ": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The adjusted optical thickness at 0.55 um measured vertically; the component of the atmosphere to quantify the removal of radiant energy from an incident beam.",
+                "long_name": "Adjusted Aerosol Optical Depth 55",
+                "significant_digits": "2",
+                "standard_name": "Adjusted_Aerosol_Optical_Depth_55",
+                "status": "official",
+                "units": "dimensionless",
+                "valid_max": 10.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "AOD_84.nc",
+        "variables": {
+            "AOD_84": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The optical thickness at 0.84 um measured vertically; the component of the atmosphere to quantify the removal of radiant energy from an incident beam.",
+                "long_name": "Aerosol Optical Depth 84",
+                "significant_digits": "2",
+                "standard_name": "Aerosol_Optical_Depth_84",
+                "status": "official",
+                "units": "dimensionless",
+                "valid_max": 10.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "CLOUD_AMT.nc",
+        "variables": {
+            "CLOUD_AMT": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The average percent of cloud amount during the temporal period.",
+                "long_name": "Cloud Amount",
+                "significant_digits": "2",
+                "standard_name": "Cloud_Amount",
+                "status": "official",
+                "units": "%",
+                "valid_max": 100.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "CLOUD_AMT_DAY.nc",
+        "variables": {
+            "CLOUD_AMT_DAY": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The average percent of cloud amount during daylight.",
+                "long_name": "Cloud Amount at Daytime",
+                "significant_digits": "2",
+                "standard_name": "Cloud_Amount_at_Daytime",
+                "status": "official",
+                "units": "%",
+                "valid_max": 100.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "CLOUD_AMT_NIGHT.nc",
+        "variables": {
+            "CLOUD_AMT_NIGHT": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The average percent of cloud amount during nighttime.",
+                "long_name": "Cloud Amount at Nighttime",
+                "significant_digits": "2",
+                "standard_name": "Cloud_Amount_at_Nighttime",
+                "status": "official",
+                "units": "%",
+                "valid_max": 100.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "CLOUD_OD.nc",
+        "variables": {
+            "CLOUD_OD": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The vertical optical thickness between the top and bottom of a cloud.",
+                "long_name": "Cloud Optical Visible Depth",
+                "significant_digits": "2",
+                "standard_name": "Cloud_Optical_Visible_Depth",
+                "status": "official",
+                "units": "dimensionless",
+                "valid_max": 400.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "CLRSKY_DAYS.nc",
+        "variables": {
+            "CLRSKY_DAYS": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "int16",
+                "cell_methods": "time: sum",
+                "definition": "The number of Clear Sky Days if the daytime cloud amount is less than 10 percent.",
+                "long_name": "Clear Sky Days",
+                "significant_digits": "0",
+                "standard_name": "Clear_Sky_Days",
+                "status": "official",
+                "units": "Days",
+                "valid_max": 1800.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "CLRSKY_KT.nc",
+        "variables": {
+            "CLRSKY_KT": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: compute",
+                "definition": "A fraction representing clearness of the atmosphere; the clear sky insolation that is transmitted through the atmosphere to strike the surface of the earth divided by the average of top of the atmosphere total solar irradiance incident.",
+                "long_name": "Clear Sky Insolation Clearness Index",
+                "significant_digits": "2",
+                "standard_name": "Clear_Sky_Insolation_Clearness_Index",
+                "status": "official",
+                "units": "dimensionless",
+                "valid_max": 1.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "CLRSKY_NKT.nc",
+        "variables": {
+            "CLRSKY_NKT": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: compute",
+                "definition": "The average zenith angle-independent expression of the clear sky insolation clearness index.",
+                "long_name": "Clear Sky Normalized Insolation Clearness Index",
+                "significant_digits": "2",
+                "standard_name": "Clear_Sky_Normalized_Insolation_Clearness_Index",
+                "status": "official",
+                "units": "dimensionless",
+                "valid_max": 1.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "CLRSKY_SFC_LW_DWN.nc",
+        "variables": {
+            "CLRSKY_SFC_LW_DWN": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The downward thermal infrared irradiance under clear sky conditions reaching a horizontal plane on the surface of the earth. Also known as Horizontal Infrared Radiation Intensity from Sky.",
+                "long_name": "Clear Sky Surface Longwave Downward Irradiance",
+                "significant_digits": "2",
+                "standard_name": "Clear_Sky_Surface_Longwave_Downward_Irradiance",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "CLRSKY_SFC_LW_UP.nc",
+        "variables": {
+            "CLRSKY_SFC_LW_UP": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The upward thermal infrared irradiance under clear sky conditions.",
+                "long_name": "Clear Sky Surface Longwave Upward Irradiance",
+                "significant_digits": "2",
+                "standard_name": "Clear_Sky_Surface_Longwave_Upward_Irradiance",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "CLRSKY_SFC_PAR_DIFF.nc",
+        "variables": {
+            "CLRSKY_SFC_PAR_DIFF": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The diffuse (scattered from original direct path by molecules or particles) Photosynthetically Active Radiation (PAR) solar irradiance incident on a horizontal plane at the surface of the earth under clear sky conditions.",
+                "long_name": "Clear Sky Surface Diffuse PAR",
+                "significant_digits": "2",
+                "standard_name": "Clear_Sky_Surface_Diffuse_PAR",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "CLRSKY_SFC_PAR_DIRH.nc",
+        "variables": {
+            "CLRSKY_SFC_PAR_DIRH": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The Photosynthetically Active Radiation (PAR) solar irradiance incident on a horizontal plane at the surface of the earth under clear sky conditions.",
+                "long_name": "Clear Sky Surface Direct Horizontal PAR",
+                "significant_digits": "2",
+                "standard_name": "Clear_Sky_Surface_Direct_Horizontal_PAR",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "CLRSKY_SFC_PAR_TOT.nc",
+        "variables": {
+            "CLRSKY_SFC_PAR_TOT": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The total Photosynthetically Active Radiation (PAR) incident on a horizontal plane at the surface of the earth under clear sky conditions.",
+                "long_name": "Clear Sky Surface Total PAR",
+                "significant_digits": "2",
+                "standard_name": "Clear_Sky_Surface_Total_PAR",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "CLRSKY_SFC_SW_DIFF.nc",
+        "variables": {
+            "CLRSKY_SFC_SW_DIFF": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The diffuse (scattered from original direct path by molecules or particles) solar irradiance incident on a horizontal plane at the surface of the earth under clear sky conditions.",
+                "long_name": "Clear Sky Surface Shortwave Downward Diffuse Irradiance",
+                "significant_digits": "2",
+                "standard_name": "Clear_Sky_Surface_Shortwave_Downward_Diffuse_Irradiance",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "CLRSKY_SFC_SW_DIRH.nc",
+        "variables": {
+            "CLRSKY_SFC_SW_DIRH": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The solar irradiance incident on a horizontal plane at the surface of the earth under clear sky conditions.",
+                "long_name": "Clear Sky Surface Shortwave Direct Horizontal Irradiance",
+                "significant_digits": "2",
+                "standard_name": "Clear_Sky_Surface_Shortwave_Direct_Horizontal_Irradiance",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "CLRSKY_SFC_SW_DNI.nc",
+        "variables": {
+            "CLRSKY_SFC_SW_DNI": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The direct solar irradiance incident to a horizontal plane normal (perpendicular) to the direction of the sun's position under clear sky conditions.",
+                "long_name": "Clear Sky Surface Shortwave Downward Direct Normal Irradiance",
+                "significant_digits": "2",
+                "standard_name": "Clear_Sky_Surface_Shortwave_Downward_Direct_Normal_Irradiance",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "CLRSKY_SFC_SW_DWN.nc",
+        "variables": {
+            "CLRSKY_SFC_SW_DWN": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The total solar irradiance incident (direct plus diffuse) on a horizontal plane at the surface of the earth under clear sky conditions. An alternative term for the total solar irradiance is the \"Global Horizontal Irradiance\" or GHI.",
+                "long_name": "Clear Sky Surface Shortwave Downward Irradiance",
+                "significant_digits": "2",
+                "standard_name": "Clear_Sky_Surface_Shortwave_Downward_Irradiance",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "CLRSKY_SFC_SW_UP.nc",
+        "variables": {
+            "CLRSKY_SFC_SW_UP": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The upward shortwave irradiance under clearsky conditions.",
+                "long_name": "Clear Sky Surface Shortwave Upward Irradiance",
+                "significant_digits": "2",
+                "standard_name": "Clear_Sky_Surface_Shortwave_Upward_Irradiance",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "CLRSKY_SRF_ALB.nc",
+        "variables": {
+            "CLRSKY_SRF_ALB": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The clear sky rate of reflectivity of the earth's surface; the ratio of the solar energy reflected by the surface of the earth compared to the total solar energy incident reaching the surface of the earth.",
+                "long_name": "Clear Sky Surface Albedo",
+                "significant_digits": "2",
+                "standard_name": "Clear_Sky_Surface_Albedo",
+                "status": "official",
+                "units": "dimensionless",
+                "valid_max": 1.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "MIDDAY_INSOL.nc",
+        "variables": {
+            "MIDDAY_INSOL": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The total amount of solar irradiance (direct plus diffuse) incident on a horizontal plane at the earth's surface during the solar noon hour midday period.",
+                "long_name": "Midday Insolation Incident",
+                "significant_digits": "2",
+                "standard_name": "Midday_Insolation_Incident",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "PSH.nc",
+        "variables": {
+            "PSH": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The average intensity of solar irradiance that reaches the surface.",
+                "long_name": "Peak Sun Hour",
+                "significant_digits": "2",
+                "standard_name": "Peak_Sun_Hour",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 10.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "PW.nc",
+        "variables": {
+            "PW": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The total atmospheric water vapor contained in a vertical column of the atmosphere, sourced from CERES.",
+                "long_name": "Precipitable Water",
+                "significant_digits": "2",
+                "standard_name": "Precipitable_Water",
+                "status": "official",
+                "units": "cm",
+                "valid_max": 10.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "SRF_ALB_ADJ.nc",
+        "variables": {
+            "SRF_ALB_ADJ": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The ratio of the solar energy reflected by the surface of the earth compared to the total solar energy incident reaching the surface of the earth. Adjusted refers to CERES source parameter.",
+                "long_name": "Surface Albedo Adjusted",
+                "significant_digits": "2",
+                "standard_name": "Surface_Albedo_Adjusted",
+                "status": "official",
+                "units": "dimensionless",
+                "valid_max": 1.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "TOA_SW_DNI.nc",
+        "variables": {
+            "TOA_SW_DNI": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The total solar irradiance incident (direct plus diffuse) on a horizontal plane where oriented to the sun's position at the top of the atmosphere (extraterrestrial radiation).",
+                "long_name": "Top-Of-Atmosphere Shortwave Direct Normal Radiation",
+                "significant_digits": "2",
+                "standard_name": "Top-Of-Atmosphere_Shortwave_Direct_Normal_Radiation",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "TOA_SW_DWN.nc",
+        "variables": {
+            "TOA_SW_DWN": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The total solar irradiance incident (direct plus diffuse) on a horizontal plane at the top of the atmosphere (extraterrestrial radiation).",
+                "long_name": "Top-Of-Atmosphere Shortwave Downward Irradiance",
+                "significant_digits": "2",
+                "standard_name": "Top-Of-Atmosphere_Shortwave_Downward_Irradiance",
+                "status": "official",
+                "units": "W m-2",
+                "valid_max": 1500.0,
+                "valid_min": 0.0
+            }
+        }
+    },
+    {
+        "file_name": "TS_ADJ.nc",
+        "variables": {
+            "TS_ADJ": {
+                "_ARRAY_DIMENSIONS": [
+                    "time",
+                    "lat",
+                    "lon"
+                ],
+                "base": "float32",
+                "cell_methods": "time: mean",
+                "definition": "The adjusted average temperature at the earth's surface. Adjusted refers to CERES source parameter.",
+                "long_name": "Earth Skin Temperature Adjusted",
+                "significant_digits": "2",
+                "standard_name": "Earth_Skin_Temperature_Adjusted",
+                "status": "official",
+                "units": "C",
+                "valid_max": 80.0,
+                "valid_min": -125.0
+            }
+        }
+    }
+]
