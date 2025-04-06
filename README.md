@@ -82,11 +82,11 @@ The Geospatial Database project processes geographical data through several stag
    - If you're adding a *new feature*, create a new branch and PR into it.
 
 12. **Project-specific practices**
-    - **Branch naming convention:** Capitalize first letter of each word and join words with hyphens (e.g., `Data-Download-Scripts`)
-    - **Code review process:** Check raised pull request and merge with branch if it looks okay!
-    - **PR merging responsibilities:** Merge ASAP. Check repo daily please!
-    - **Commit message format:** "Added xyz feature"
-    - **Checklist:** Update checklist as and when done. Feel free to add new features!
+   - **Branch naming convention:** Capitalize first letter of each word and join words with hyphens (e.g., `Data-Download-Scripts`)
+   - **Code review process:** Check raised pull request and merge with branch if it looks okay!
+   - **PR merging responsibilities:** Merge ASAP. Check repo daily please!
+   - **Commit message format:** "Added xyz feature"
+   - **Checklist:** Update checklist as and when done. Feel free to add new features!
 
 
 ## CheckList
