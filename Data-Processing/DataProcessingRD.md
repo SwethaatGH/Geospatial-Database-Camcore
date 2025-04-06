@@ -29,14 +29,15 @@ Links to dbs:
 [SoilGrids](https://www.isric.org/explore/soilgrids/faq-soilgrids#When_100_metres_resolution)
 [NASA Power](https://power.larc.nasa.gov/docs/tutorials/service-data-request/aws/)
 [Terraclim](https://www.climatologylab.org/terraclimate-variables.html)
-[Chirps](https://www.worldclim.org/data/worldclim21.html)
-[Evapotranspiration](https://www.worldclim.org/data/worldclim21.html)
-[SPEI](https://www.worldclim.org/data/worldclim21.html)
+[Chirps](https://developers.google.com/earth-engine/datasets/catalog/ECMWF_ERA5_LAND_DAILY_AGGR)
+[Evapotranspiration](https://developers.google.com/earth-engine/datasets/catalog/MODIS_NTSG_MOD16A2_105)
+[SPEI](https://developers.google.com/earth-engine/datasets/catalog/CSIC_SPEI_2_10)
 
+==Run all batch files in osgeo shell (Comes with QGIS installation)==
 
 ## CheckList
 - [ ] Automate soilgrids resampling 
 - [ ] Resample ERA5 with space considerations
-- [ ] Add Links to chirps, spei and et
+- [x] Add Links to chirps, spei and et
 - [ ] Add remaining scale factors
 - [ ] Fix Terraclim Nans to -9999.0

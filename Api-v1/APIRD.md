@@ -1,0 +1,8 @@
+# Steps to run API:
+
+1. Make sure you are connected to a University WiFi (or using VPN)
+2. Ensure you have Postgres and POSTGIS Downloaded and added to path. Refer to readme in data upload for steps. 
+3. Establish ssh tunnel to connect to postgis db on Camcore premises. 
+`ssh -L 5433:localhost:5432 user@remote.example.com`  
+4. Run `pip install -r requirements.text` to your venv
+5. Start dev server: `uvicorn app.main:app --reload` 

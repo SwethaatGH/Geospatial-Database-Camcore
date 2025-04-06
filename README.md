@@ -85,9 +85,9 @@ The Geospatial Database project processes geographical data through several stag
 
 ## CheckList
 
-- [ ] Data download scripts
-- [ ] Data resampling
-- [ ] Data upload to PostGIS
+- [x] Data download scripts
+- [x] Data resampling
+- [x] Data upload to PostGIS
 - [ ] API v1 implementation
 - [ ] API v2 with enhanced features
 - [ ] CSV creator
