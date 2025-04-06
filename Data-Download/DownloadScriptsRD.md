@@ -30,18 +30,22 @@ ds_region = ds[var].sel(
 ### 1.4. DownloadMODIS_GEE:
 ---
 - MOD16A2 downloaded from Google Earth Engine on Google Colab.
+- GEE link: https://developers.google.com/earth-engine/datasets/catalog/MODIS_NTSG_MOD16A2_105
 
 ### 1.5. DownloadCHIRPS_GEE:
 ---
 - CHIRPSDaily downloaded from Google Earth Engine on Google Colab.
+- GEE link: https://developers.google.com/earth-engine/datasets/catalog/UCSB-CHG_CHIRPS_DAILY#bands
 
 ### 1.6. DownloadERA5Land_GEE:
 ---
 - ERA5Land downloaded from Google Earth Engine on Google Colab.
+- GEE link: https://developers.google.com/earth-engine/datasets/catalog/ECMWF_ERA5_LAND_DAILY_AGGR
 
 ### 1.7. DownloadSPEIbase_GEE:
 ---
 - SPEIbase downloaded from Google Earth Engine on Google Colab.
+- GEE link: https://developers.google.com/earth-engine/datasets/catalog/CSIC_SPEI_2_10
 
 
 ## 2. Download Process 
