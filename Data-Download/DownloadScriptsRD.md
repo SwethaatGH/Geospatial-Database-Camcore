@@ -33,7 +33,7 @@ ds_region = ds[var].sel(
 
 ### 1.5. DownloadCHIRPS_GEE:
 ---
-- CHIRPS downloaded from Google Earth Engine on Google Colab.
+- CHIRPSDaily downloaded from Google Earth Engine on Google Colab.
 
 ### 1.6. DownloadERA5Land_GEE:
 ---
