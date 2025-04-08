@@ -8,3 +8,12 @@
 5. Run `pip install -r .\app\requirements.text` to your venv
 6. Start dev server: `uvicorn app.main:app --reload` 
 7. To obtain temporary URL use ngrok 
+
+## Checklist:
+- [ ] Scale Factors Add 
+- [ ] Date Validation
+- [ ] Latitude Validation
+- [ ] Add TerraClim
+- [ ] Add Soil Grids
+- [ ] Add elev
+- [ ] Add NASA Power
