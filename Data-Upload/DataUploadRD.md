@@ -13,4 +13,4 @@
 --- 
 Run all batch files in command line 
 
-==Database with Worldclim, ET, CHIRPS, SPEI, Elevation, Terraclim is 386 GB==
+**Database with Worldclim, ET, CHIRPS, SPEI, Elevation, Terraclim, Nasa Power is 1.17 TB**
