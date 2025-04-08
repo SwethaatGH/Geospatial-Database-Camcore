@@ -2,7 +2,7 @@
 
 #### Make sure path is added for postgres bin to environment variable Path after downloading Postgres. Add POSTGIS in stack builder. Download process is [here](https://postgis.net/documentation/getting_started/install_windows/).
 
-- Postgis version:
+- Postgis version: 
 - Postgres version:
 - QGIS version:
 ---

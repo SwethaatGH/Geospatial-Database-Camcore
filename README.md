@@ -90,14 +90,14 @@ The Geospatial Database project processes geographical data through several stag
 
 
 ## CheckList
-
+- [ ] Update Software Versions in Upload
 - [x] Data download scripts
 - [x] Data resampling
 - [x] Data upload to PostGIS
-- [ ] API v1 implementation
+- [x] API v1 implementation
 - [ ] API v2 with enhanced features
-- [ ] CSV creator
-- [ ] Covariables creator
+- [x] CSV creator
+- [x] Covariables creator
 - [ ] Package for Covariables creator
 - [ ] Airflow pipeline for automation of new data download
 - [ ] Implement other region downloads and pipeline for db creation
