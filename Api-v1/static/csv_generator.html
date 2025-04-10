@@ -110,7 +110,7 @@
         }
         
         .download-btn {
-            margin: 10px 0;
+            margin: 10px 10px 10px 0;
             background-color: #2196F3;
         }
         
@@ -306,16 +306,6 @@
                 
                 resultsSection.style.display = 'block';
                 
-                // Try auto-downloading files if supported
-                if (data.rawDataFile) {
-                    triggerDownload(data.rawDataFile);
-                }
-                
-                if (data.covariatesFile) {
-                    setTimeout(() => {
-                        triggerDownload(data.covariatesFile);
-                    }, 1000); // Delay second download by 1 second
-                }
             }
             
             // Create a download button
