@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from app.database import get_db
 from typing import Optional, List, Literal, Callable
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from enum import Enum
 from fastapi import FastAPI
@@ -1644,3 +1645,24 @@ async def download_file(job_id: str, filename: str):
         filename=filename,
         media_type="application/octet-stream"
     )
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Cleanup logic on startup
+    base_dir = Path(__file__).resolve().parent.parent  # Points to Api-v1/
+    csv_creator_path = (base_dir / "../Csv-Creator").resolve()
+
+    for subdir in ["uploads", "processed"]:
+        dir_path = csv_creator_path / subdir
+        if dir_path.exists():
+            for item in dir_path.iterdir():
+                if item.is_dir():
+                    shutil.rmtree(item)
+                else:
+                    item.unlink()
+        else:
+            dir_path.mkdir(parents=True)
+
+    print("🧹 Cleaned uploads/ and processed/ directories on startup.")
+    
+    yield
