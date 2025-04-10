@@ -130,7 +130,7 @@ def process_csv_file(input_csv_path, output_csv_path, default_start_date=None, d
     # Read the input CSV file
     try:
         df = pd.read_csv(input_csv_path)
-        df = df.iloc[:100]  # Limit to first 10 rows for testing
+        df = df.iloc[:10]  # Limit to first 10 rows for testing
         print(f"Loaded CSV with {len(df)} rows")
     except Exception as e:
         print(f"Error reading input CSV: {str(e)}")
@@ -200,41 +200,42 @@ def process_csv_file(input_csv_path, output_csv_path, default_start_date=None, d
             
             coord_api_responses = {}
             
-            if process_all:
-                for data_source, variables in DATA_SOURCES.items():
-                    for variable in variables:
-                        print(f"  Querying {data_source}/{variable}...")
+            # if process_all:
+            for data_source, variables in DATA_SOURCES.items():
+                for variable in variables:
+                    print(f"  Querying {data_source}/{variable}...")
+                    
+                    climate_data = query_climate_data(
+                        lat=lat,
+                        lon=lon,
+                        start_date=start_date,
+                        end_date=end_date,
+                        data_source=data_source,
+                        variable=variable,
+                        cache=cache
+                    )
+                    # print("Climate Data:", climate_data) 
+
+                    if climate_data and 'values' in climate_data:
+                        var_name = climate_data.get('variable', variable)
                         
-                        climate_data = query_climate_data(
-                            lat=lat,
-                            lon=lon,
-                            start_date=start_date,
-                            end_date=end_date,
-                            data_source=data_source,
-                            variable=variable,
-                            cache=cache
-                        )
-                                                
-                        if climate_data and 'values' in climate_data:
-                            var_name = climate_data.get('variable', variable)
+                        temp_key = f"_api_response_{data_source}_{var_name}"
+                        results_df.at[index, temp_key] = json.dumps(climate_data)
+                        coord_api_responses[temp_key] = json.dumps(climate_data)
+                        
+                        for value_data in climate_data['values']:
+                            # In the first pass, modify column key generation
+                            if data_source == 'wc':
+                                column_key = f"{data_source}_{var_name}_{value_data['year']}-{value_data['month']:02d}"
+                            else:
+                                column_key = f"{data_source}_{var_name}_{value_data['date']}"
                             
-                            temp_key = f"_api_response_{data_source}_{var_name}"
-                            results_df.at[index, temp_key] = json.dumps(climate_data)
-                            coord_api_responses[temp_key] = json.dumps(climate_data)
-                            
-                            for value_data in climate_data['values']:
-                                # In the first pass, modify column key generation
-                                if data_source == 'wc':
-                                    column_key = f"{var_name}_{value_data['year']}-{value_data['month']:02d}"
-                                else:
-                                    column_key = f"{var_name}_{value_data['date']}"
-                                
-                                all_variable_dates[column_key] = True
-                            
-                        time.sleep(0.1)
-            else:
-                # Existing ET processing code remains the same
-                pass
+                            all_variable_dates[column_key] = True
+                        
+                    time.sleep(0.1)
+            # else:
+            #     # Existing ET processing code remains the same
+            #     pass
             
             processed_coords[coord_key] = coord_api_responses
         
@@ -247,6 +248,7 @@ def process_csv_file(input_csv_path, output_csv_path, default_start_date=None, d
         results_df[var_date_key] = None
     
     print("Processing climate data values...")
+    # print("Before:", results_df)
     for index, row in results_df.iterrows():
         for col in row.index:
             if col.startswith('_api_response_') and not pd.isna(row[col]):
@@ -259,9 +261,9 @@ def process_csv_file(input_csv_path, output_csv_path, default_start_date=None, d
                     for value_data in climate_data['values']:
                         # In the second pass, modify column name generation
                         if data_source == 'wc':
-                            column_name = f"{var_name}_{value_data['year']}-{value_data['month']:02d}"
+                            column_name = f"{data_source}_{var_name}_{value_data['year']}-{value_data['month']:02d}"
                         else:
-                            column_name = f"{var_name}_{value_data['date']}"
+                            column_name = f"{data_source}_{var_name}_{value_data['date']}"
                         
                         value = value_data.get('value')
                         
@@ -273,6 +275,7 @@ def process_csv_file(input_csv_path, output_csv_path, default_start_date=None, d
     # Remove temporary API response columns
     temp_columns = [col for col in results_df.columns if col.startswith('_api_response_')]
     results_df = results_df.drop(temp_columns, axis=1)
+    # print("After:", results_df)
     
     try:
         results_df.to_csv(output_csv_path, index=False)
@@ -296,7 +299,7 @@ def process_csv_file(input_csv_path, output_csv_path, default_start_date=None, d
 
 def main():
     parser = argparse.ArgumentParser(description='Process climate data for coordinates in a CSV file')
-    parser.add_argument('--input', default="forest_data.csv", help='Input CSV file path')
+    parser.add_argument('--input', default="forest_data_v1.csv", help='Input CSV file path')
     parser.add_argument('--output', default="forest_data_with_climate.csv", help='Output CSV file path')
     parser.add_argument('--default-start-date', default="2000-01-01", help='Default start date if data_final column is missing or empty')
     parser.add_argument('--default-end-date', default="2000-12-31", help='Default end date if date_final column is missing or empty')
