@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        
+        .container {
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .upload-area {
+            border: 2px dashed #ccc;
+            padding: 25px;
+            text-align: center;
+            margin: 20px 0;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .upload-area:hover {
+            background-color: #f8f8f8;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        #file-name {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        
+        .options {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+        }
+        
+        .options label {
+            display: block;
+            margin: 10px 0;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 2s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .results {
+            display: none;
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #e8f5e9;
+            border-radius: 5px;
+        }
+        
+        .download-btn {
+            margin: 10px 0;
+            background-color: #2196F3;
+        }
+        
+        .download-btn:hover {
+            background-color: #0b7dda;
+        }
+        
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+        
+        .info-box {
+            background-color: #e7f3fe;
+            border-left: 5px solid #2196F3;
+            padding: 10px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>CSV Generator Tool</h1>
+    
+    <div class="container">
+        <div class="info-box">
+            <p>Please upload a CSV or XLSX file containing columns for:</p>
+            <ul>
+                <li>Latitude (lat)</li>
+                <li>Longitude (lon)</li>
+                <li>Start date</li>
+                <li>End date</li>
+            </ul>
+        </div>
+        
+        <div class="upload-area" id="upload-area">
+            <p>Drag and drop your file here or click to select</p>
+            <input type="file" id="file-input" accept=".csv,.xlsx" class="hidden">
+            <div id="file-name"></div>
+        </div>
+        
+        <div id="error-message" class="error hidden"></div>
+        
+        <div class="options hidden" id="options-section">
+            <h3>Processing Options</h3>
+            <p>What would you like to generate?</p>
+            
+            <label>
+                <input type="radio" name="process-option" value="raw" checked> 
+                Just raw data
+            </label>
+            
+            <label>
+                <input type="radio" name="process-option" value="full"> 
+                Raw data and calculated covariates
+            </label>
+            
+            <button id="process-btn">Process File</button>
+        </div>
+        
+        <div class="loading" id="loading-section">
+            <div class="spinner"></div>
+            <p id="loading-message">Processing your file, please wait...</p>
+        </div>
+        
+        <div class="results" id="results-section">
+            <h3>Processing Complete</h3>
+            <p>Your files are ready for download:</p>
+            <div id="download-buttons"></div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadArea = document.getElementById('upload-area');
+            const fileInput = document.getElementById('file-input');
+            const fileName = document.getElementById('file-name');
+            const errorMessage = document.getElementById('error-message');
+            const optionsSection = document.getElementById('options-section');
+            const processBtn = document.getElementById('process-btn');
+            const loadingSection = document.getElementById('loading-section');
+            const resultsSection = document.getElementById('results-section');
+            const downloadButtons = document.getElementById('download-buttons');
+            
+            let uploadedFile = null;
+            
+            // Handle click on upload area
+            uploadArea.addEventListener('click', function() {
+                fileInput.click();
+            });
+            
+            // Handle drag and drop
+            uploadArea.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                uploadArea.style.backgroundColor = '#f0f0f0';
+            });
+            
+            uploadArea.addEventListener('dragleave', function() {
+                uploadArea.style.backgroundColor = '';
+            });
+            
+            uploadArea.addEventListener('drop', function(e) {
+                e.preventDefault();
+                uploadArea.style.backgroundColor = '';
+                
+                if (e.dataTransfer.files.length) {
+                    handleFile(e.dataTransfer.files[0]);
+                }
+            });
+            
+            // Handle file selection
+            fileInput.addEventListener('change', function() {
+                if (fileInput.files.length) {
+                    handleFile(fileInput.files[0]);
+                }
+            });
+            
+            // Process the selected file
+            function handleFile(file) {
+                // Check if file type is valid
+                const fileType = file.name.split('.').pop().toLowerCase();
+                if (fileType !== 'csv' && fileType !== 'xlsx') {
+                    showError('Please upload a CSV or XLSX file.');
+                    return;
+                }
+                
+                uploadedFile = file;
+                fileName.textContent = 'Selected file: ' + file.name;
+                errorMessage.classList.add('hidden');
+                optionsSection.classList.remove('hidden');
+            }
+            
+            // Handle process button click
+            processBtn.addEventListener('click', function() {
+                if (!uploadedFile) {
+                    showError('Please select a file first.');
+                    return;
+                }
+                
+                const processOption = document.querySelector('input[name="process-option"]:checked').value;
+                processFile(uploadedFile, processOption);
+            });
+            
+            // Process the file and send to server
+            function processFile(file, option) {
+                // Hide options and show loading
+                optionsSection.classList.add('hidden');
+                loadingSection.style.display = 'block';
+                
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('option', option);
+                
+                // Send file to server
+                fetch('/api/process-csv', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Server error: ' + response.statusText);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    loadingSection.style.display = 'none';
+                    showResults(data);
+                })
+                .catch(error => {
+                    loadingSection.style.display = 'none';
+                    showError('Error processing file: ' + error.message);
+                    optionsSection.classList.remove('hidden');
+                });
+            }
+            
+            // Show error message
+            function showError(message) {
+                errorMessage.textContent = message;
+                errorMessage.classList.remove('hidden');
+            }
+            
+            // Show results and download buttons
+            function showResults(data) {
+                downloadButtons.innerHTML = '';
+                
+                // Create download buttons for each file
+                if (data.rawDataFile) {
+                    createDownloadButton('Download Raw Data', data.rawDataFile);
+                }
+                
+                if (data.covariatesFile) {
+                    createDownloadButton('Download Covariates Data', data.covariatesFile);
+                }
+                
+                resultsSection.style.display = 'block';
+                
+                // Try auto-downloading files if supported
+                if (data.rawDataFile) {
+                    triggerDownload(data.rawDataFile);
+                }
+                
+                if (data.covariatesFile) {
+                    setTimeout(() => {
+                        triggerDownload(data.covariatesFile);
+                    }, 1000); // Delay second download by 1 second
+                }
+            }
+            
+            // Create a download button
+            function createDownloadButton(text, filePath) {
+                const button = document.createElement('button');
+                button.textContent = text;
+                button.className = 'download-btn';
+                button.addEventListener('click', function() {
+                    triggerDownload(filePath);
+                });
+                
+                downloadButtons.appendChild(button);
+            }
+            
+            // Trigger file download
+            function triggerDownload(filePath) {
+                const link = document.createElement('a');
+                link.href = filePath;
+                link.download = filePath.split('/').pop();
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        });
+    </script>
+</body>
+</html>

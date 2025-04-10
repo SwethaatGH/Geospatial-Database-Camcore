@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from app.database import get_db
@@ -7,12 +8,18 @@ from datetime import datetime, timedelta
 from enum import Enum
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 import os
-
+import shutil
+import subprocess
+import uuid
+from pathlib import Path
+import tempfile
 
 
 os.makedirs("static", exist_ok=True)
+os.makedirs("../Csv-Creator/uploads", exist_ok=True)
+os.makedirs("../Csv-Creator/processed", exist_ok=True)
 
 # # Create the HTML file in the static directory
 # html_content = """<!DOCTYPE html>
@@ -1555,3 +1562,85 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 async def get_ui():
     with open("static/timeseries.html", "r") as f:
         return f.read()
+    
+@app.get("/CSVGenerator", response_class=HTMLResponse)
+async def get_csv_generator():
+    with open("static/csv_generator.html", "r") as f:
+        return f.read()
+    
+@app.post("/api/process-csv")
+async def process_csv(
+    file: UploadFile = File(...),
+    option: str = Form(...)
+):
+    # Validate file type
+    if not file.filename.endswith(('.csv', '.xlsx')):
+        raise HTTPException(status_code=400, detail="Only CSV or XLSX files are accepted")
+    
+    # Generate unique ID for this processing job
+    job_id = str(uuid.uuid4())
+    upload_dir = Path(f"../Csv-Creator/uploads/{job_id}")
+    processed_dir = Path(f"../Csv-Creator/processed/{job_id}")
+    
+    # Create directories
+    os.makedirs(upload_dir, exist_ok=True)
+    os.makedirs(processed_dir, exist_ok=True)
+    
+    # Save the uploaded file
+    file_path = upload_dir / file.filename
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    # Path for the results
+    raw_data_path = processed_dir / f"raw_data_{file.filename}"
+    covariates_path = processed_dir / f"covariates_{file.filename}"
+    
+    # Run the script to generate raw data
+    try:
+        # Replace with the path to your script
+        raw_data_script = "../Csv-Creator/script.py"
+        subprocess.run([
+            "python", raw_data_script,
+            "--input", str(file_path),
+            "--output", str(raw_data_path),
+            "--default-start-date", "2000-01-01",
+            "--default-end-date", "2000-12-31",
+            "--all-variables",
+            "--cache-file", f"{processed_dir}/cache.json"
+        ], check=True)
+        
+        # For "full" option, also generate covariates
+        if option == "full":
+            covariates_script = "../Csv-Creator/covariablesv3.py"
+            subprocess.run([
+            "python", covariates_script,
+            "--input", str(raw_data_path),
+            "--output", str(covariates_path)
+        ], check=True)
+            
+            return {
+                "rawDataFile": f"/download/{job_id}/raw_data_{file.filename}",
+                "covariatesFile": f"/download/{job_id}/covariates_{file.filename}"
+            }
+        else:
+            return {
+                "rawDataFile": f"/download/{job_id}/raw_data_{file.filename}"
+            }
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
+# Endpoint to download processed files
+@app.get("/download/{job_id}/{filename}")
+async def download_file(job_id: str, filename: str):
+    file_path = Path(f"processed/{job_id}/{filename}")
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    return FileResponse(
+        path=file_path,
+        filename=filename,
+        media_type="application/octet-stream"
+    )
