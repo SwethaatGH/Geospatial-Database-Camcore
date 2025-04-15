@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Climate Data Interface</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.3/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: Arial, sans-serif;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .top-section {
+            display: flex;
+            height: 60%;
+        }
+
+        #map {
+            flex: 2;
+            width: 100%;
+        }
+
+        .controls {
+            flex: 1;
+            padding: 20px;
+            background-color: #f5f5f5;
+            overflow-y: auto;
+        }
+
+        .chart-section {
+            height: 40%;
+            padding: 20px;
+            background-color: #fff;
+            border-top: 1px solid #ddd;
+        }
+
+        h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        select,
+        input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+            width: 100%;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .coordinates {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #e9e9e9;
+            border-radius: 4px;
+        }
+
+        .loading {
+            display: none;
+            margin-top: 10px;
+            color: #666;
+        }
+
+        .error {
+            color: #d9534f;
+            margin-top: 10px;
+        }
+
+        #chartContainer {
+            width: 100%;
+            height: 100%;
+        }
+
+        .tab-container {
+            margin-bottom: 15px;
+        }
+
+        .tab {
+            display: inline-block;
+            padding: 8px 16px;
+            cursor: pointer;
+            background-color: #f2f2f2;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            border-radius: 4px 4px 0 0;
+        }
+
+        .tab.active {
+            background-color: #fff;
+            border-bottom: 1px solid #fff;
+            margin-bottom: -1px;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 0 4px 4px 4px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .point-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        .point-table th,
+        .point-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .point-table th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="top-section">
+            <div id="map"></div>
+            <div class="controls">
+                <h3>Climate Data Explorer</h3>
+
+                <!-- Tabs for Point vs BBox mode -->
+                <div class="tab-container">
+                    <div class="tab active" id="tab-point">Point Mode</div>
+                    <div class="tab" id="tab-bbox">Bounding Box Mode</div>
+                </div>
+
+                <!-- Point Mode Content -->
+                <div class="tab-content active" id="content-point">
+                    <div class="coordinates" id="selected-point">
+                        <p>Click on the map to select a point.</p>
+                    </div>
+
+                    <label for="data-source-point">Data Source:</label>
+                    <select id="data-source-point">
+                        <option value="wc">WorldClim</option>
+                        <option value="spei">SPEI</option>
+                        <option value="chirps">CHIRPS</option>
+                        <option value="et">ET</option>
+                        <option value="elev">Elevation</option>
+                        <option value="sg">SoilGrids</option>
+                        <option value="tc">TerraClim</option>
+                        <option value="np">NASA POWER</option>
+                    </select>
+
+                    <label for="variable-point">Variable:</label>
+                    <select id="variable-point">
+                        <option value="prec">Precipitation</option>
+                        <option value="tmax">Max Temperature</option>
+                        <option value="tmin">Min Temperature</option>
+                    </select>
+
+                    <div id="date-controls-point">
+                        <label for="start-date">Start Date:</label>
+                        <input type="date" id="start-date">
+
+                        <label for="end-date">End Date:</label>
+                        <input type="date" id="end-date">
+                    </div>
+
+                    <button id="fetch-point-data">Fetch Time Series Data</button>
+                    <button id="clear-point-selection">Clear Selection</button>
+                </div>
+
+                <!-- Bounding Box Mode Content -->
+                <div class="tab-content" id="content-bbox">
+                    <div class="coordinates" id="selected-bbox">
+                        <p>Use the rectangle tool to draw a bounding box on the map.</p>
+                    </div>
+
+                    <label for="data-source-bbox">Data Source:</label>
+                    <select id="data-source-bbox">
+                        <option value="wc">WorldClim</option>
+                        <option value="spei">SPEI</option>
+                        <option value="chirps">CHIRPS</option>
+                        <option value="et">ET</option>
+                        <option value="elev">Elevation</option>
+                        <option value="sg">SoilGrids</option>
+                        <option value="tc">TerraClim</option>
+                        <option value="np">NASA POWER</option>
+                    </select>
+
+                    <label for="variable-bbox">Variable:</label>
+                    <select id="variable-bbox">
+                        <option value="prec">Precipitation</option>
+                        <option value="tmax">Max Temperature</option>
+                        <option value="tmin">Min Temperature</option>
+                    </select>
+
+                    <!-- <div id="date-controls-bbox">
+                        <label for="bbox-date">Date:</label>
+                        <input type="date" id="bbox-date">
+                    </div> -->
+                    <div id="date-controls-bbox">
+                        <div id="bbox-single-date" style="display: block;">
+                            <label for="bbox-date">Date:</label>
+                            <input type="date" id="bbox-date">
+                        </div>
+                    
+                        <div id="bbox-time-series" style="display: none;">
+                            <label for="bbox-start-date">Start Date:</label>
+                            <input type="date" id="bbox-start-date">
+                    
+                            <label for="bbox-end-date">End Date:</label>
+                            <input type="date" id="bbox-end-date">
+                        </div>
+                    
+                        <div style="margin-top: 10px;">
+                            <input type="checkbox" id="bbox-time-series-toggle">
+                            <label for="bbox-time-series-toggle" style="display: inline;">Enable Time Series</label>
+                        </div>
+                    </div>
+
+
+                    <button id="fetch-bbox-data">Fetch Bounding Box Data</button>
+                    <button id="clear-bbox-selection">Clear Selection</button>
+
+                    <div id="points-info" style="display: none;">
+                        <h4>Sample Points:</h4>
+                        <p id="points-summary"></p>
+                    </div>
+                </div>
+
+                <div id="loading" class="loading">Loading data...</div>
+                <div id="error" class="error"></div>
+            </div>
+        </div>
+        <div class="chart-section">
+            <div id="chartContainer">
+                <canvas id="timeSeriesChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.3/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <script>
+        // Initialize map
+        // Define the initial bounding box (-94.187, -39.020, 37.062, 18.229)
+        const initialBbox = [
+            [-39.020, -94.187], // Southwest corner (lat, lng)
+            [18.229, 37.062]    // Northeast corner (lat, lng)
+        ];
+
+        const map = L.map('map').fitBounds(initialBbox);
+
+        // Add OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Initialize Leaflet Draw
+        const drawnItems = new L.FeatureGroup();
+        map.addLayer(drawnItems);
+
+        const drawControl = new L.Control.Draw({
+            draw: {
+                polyline: false,
+                polygon: false,
+                circle: false,
+                circlemarker: false,
+                marker: true,
+                rectangle: {
+                    shapeOptions: {
+                        color: '#4CAF50',
+                        weight: 2
+                    }
+                }
+            },
+            edit: {
+                featureGroup: drawnItems,
+                remove: true
+            }
+        });
+        map.addControl(drawControl);
+
+        // Variables to store selected data
+        let selectedPoint = null;
+        let selectedMarker = null;
+        let bboxCoordinates = null;
+        let bboxRectangle = null;
+        let timeSeriesChart = null;
+        let pointsData = null;
+
+        // Tab switching functionality
+        document.getElementById('tab-point').addEventListener('click', function () {
+            document.getElementById('tab-point').classList.add('active');
+            document.getElementById('tab-bbox').classList.remove('active');
+            document.getElementById('content-point').classList.add('active');
+            document.getElementById('content-bbox').classList.remove('active');
+        });
+
+        document.getElementById('tab-bbox').addEventListener('click', function () {
+            document.getElementById('tab-point').classList.remove('active');
+            document.getElementById('tab-bbox').classList.add('active');
+            document.getElementById('content-point').classList.remove('active');
+            document.getElementById('content-bbox').classList.add('active');
+        });
+
+        // Update variable dropdown based on selected data source (Point Mode)
+        document.getElementById('data-source-point').addEventListener('change', function () {
+            updateVariableDropdown(this.value, 'variable-point', 'date-controls-point');
+        });
+
+        document.getElementById('bbox-time-series-toggle').addEventListener('change', function () {
+                if (this.checked) {
+                    document.getElementById('bbox-single-date').style.display = 'none';
+                    document.getElementById('bbox-time-series').style.display = 'block';
+                } else {
+                    document.getElementById('bbox-single-date').style.display = 'block';
+                    document.getElementById('bbox-time-series').style.display = 'none';
+                }
+            });
+
+        // Update variable dropdown based on selected data source (BBox Mode)
+        document.getElementById('data-source-bbox').addEventListener('change', function () {
+            updateVariableDropdown(this.value, 'variable-bbox', 'date-controls-bbox');
+        });
+
+        // Function to update variable dropdown based on data source
+        function updateVariableDropdown(dataSource, variableSelectId, dateControlsId) {
+            const variableSelect = document.getElementById(variableSelectId);
+            const dateControls = document.getElementById(dateControlsId);
+
+            // Clear current options
+            variableSelect.innerHTML = '';
+
+            // Add appropriate options based on data source
+            if (dataSource === 'wc') {
+                addOption(variableSelect, 'prec', 'Precipitation');
+                addOption(variableSelect, 'tmax', 'Max Temperature');
+                addOption(variableSelect, 'tmin', 'Min Temperature');
+                dateControls.style.display = 'block';
+            } else if (dataSource === 'spei') {
+                addOption(variableSelect, 'spei', 'SPEI');
+                dateControls.style.display = 'block';
+            } else if (dataSource === 'chirps') {
+                addOption(variableSelect, 'chirps', 'Precipitation');
+                dateControls.style.display = 'block';
+            } else if (dataSource === 'et') {
+                addOption(variableSelect, 'et', 'Evapotranspiration');
+                dateControls.style.display = 'block';
+            } else if (dataSource === 'elev') {
+                addOption(variableSelect, 'elev', 'Elevation');
+                dateControls.style.display = 'none';
+            } else if (dataSource === 'sg') {
+                addOption(variableSelect, 'bdod', 'Bulk Density');
+                addOption(variableSelect, 'cec', 'Cation Exchange Capacity');
+                addOption(variableSelect, 'cfvo', 'Coarse Fragments Volumetric');
+                addOption(variableSelect, 'clay', 'Clay Content');
+                addOption(variableSelect, 'nitrogen', 'Nitrogen');
+                addOption(variableSelect, 'ocd', 'Organic Carbon Density');
+                addOption(variableSelect, 'ocs', 'Organic Carbon Stock');
+                addOption(variableSelect, 'phh2o', 'pH in H2O');
+                addOption(variableSelect, 'sand', 'Sand Content');
+                addOption(variableSelect, 'silt', 'Silt Content');
+                addOption(variableSelect, 'soc', 'Soil Organic Carbon');
+                addOption(variableSelect, 'wv0010', 'Water Vapor Content at 10cm Depth');
+                addOption(variableSelect, 'wv0030', 'Water Vapor Content at 30cm Depth');
+                addOption(variableSelect, 'wv1500', 'Water Vapor Content at 1500cm Depth');
+                dateControls.style.display = 'none';
+            } else if (dataSource === 'tc') {
+                // TerraClim variables
+                addOption(variableSelect, 'aet', 'Actual Evapotranspiration');
+                addOption(variableSelect, 'def', 'Water Deficit');
+                addOption(variableSelect, 'pdsi', 'PDSI');
+                addOption(variableSelect, 'pet', 'Potential Evapotranspiration');
+                addOption(variableSelect, 'ppt', 'Precipitation');
+                addOption(variableSelect, 'q', 'Runoff');
+                addOption(variableSelect, 'soil', 'Soil Moisture');
+                addOption(variableSelect, 'srad', 'Solar Radiation');
+                addOption(variableSelect, 'tmax', 'Max Temperature');
+                addOption(variableSelect, 'tmin', 'Min Temperature');
+                addOption(variableSelect, 'vap', 'Vapor Pressure');
+                addOption(variableSelect, 'vpd', 'Vapor Pressure Deficit');
+                addOption(variableSelect, 'ws', 'Wind Speed');
+                dateControls.style.display = 'block';
+            } else if (dataSource === 'np') {
+                // NASA POWER variables (add more as needed)
+                addOption(variableSelect, 'allsky_sfc_sw_dwn', 'All-Sky Surface SW Down');
+                dateControls.style.display = 'block';
+            }
+        }
+
+        // Handle map click event for point selection
+        map.on('click', function (e) {
+            // Only handle clicks in point mode
+            if (!document.getElementById('content-point').classList.contains('active')) {
+                return;
+            }
+
+            const lat = e.latlng.lat.toFixed(6);
+            const lon = e.latlng.lng.toFixed(6);
+
+            // Update selected point
+            selectedPoint = { lat, lon };
+
+            // Update UI
+            document.getElementById('selected-point').innerHTML = `
+                <strong>Selected Point:</strong><br>
+                Latitude: ${lat}<br>
+                Longitude: ${lon}
+            `;
+
+            // Remove previous marker if exists
+            if (selectedMarker) {
+                map.removeLayer(selectedMarker);
+            }
+
+            // Add new marker
+            selectedMarker = L.marker([lat, lon]).addTo(map);
+        });
+
+        // Handle drawn items event for bounding box
+        map.on('draw:created', function (e) {
+            const type = e.layerType;
+            const layer = e.layer;
+
+            if (type === 'rectangle') {
+                // Clear previous bounding box
+                drawnItems.eachLayer(function (layer) {
+                    if (layer instanceof L.Rectangle) {
+                        drawnItems.removeLayer(layer);
+                    }
+                });
+
+                // Add the new bounding box
+                drawnItems.addLayer(layer);
+                bboxRectangle = layer;
+
+                // Get coordinates
+                const bounds = layer.getBounds();
+                bboxCoordinates = {
+                    min_lat: bounds.getSouth().toFixed(6),
+                    min_lon: bounds.getWest().toFixed(6),
+                    max_lat: bounds.getNorth().toFixed(6),
+                    max_lon: bounds.getEast().toFixed(6)
+                };
+
+                // Update UI
+                document.getElementById('selected-bbox').innerHTML = `
+                    <strong>Selected Bounding Box:</strong><br>
+                    South: ${bboxCoordinates.min_lat}<br>
+                    West: ${bboxCoordinates.min_lon}<br>
+                    North: ${bboxCoordinates.max_lat}<br>
+                    East: ${bboxCoordinates.max_lon}
+                `;
+            } else if (type === 'marker') {
+                // Add marker in point mode
+                if (document.getElementById('content-point').classList.contains('active')) {
+                    // Remove previous marker if exists
+                    if (selectedMarker) {
+                        map.removeLayer(selectedMarker);
+                    }
+
+                    // Add the new marker
+                    drawnItems.addLayer(layer);
+                    selectedMarker = layer;
+
+                    // Get coordinates
+                    const latlng = layer.getLatLng();
+                    const lat = latlng.lat.toFixed(6);
+                    const lon = latlng.lng.toFixed(6);
+
+                    // Update selected point
+                    selectedPoint = { lat, lon };
+
+                    // Update UI
+                    document.getElementById('selected-point').innerHTML = `
+                        <strong>Selected Point:</strong><br>
+                        Latitude: ${lat}<br>
+                        Longitude: ${lon}
+                    `;
+                }
+            }
+        });
+
+        // Fetch point data button click handler
+        document.getElementById('fetch-point-data').addEventListener('click', async function () {
+            // Check if a point is selected
+            if (!selectedPoint) {
+                showError('Please select a point on the map first.');
+                return;
+            }
+
+            // Get form values
+            const dataSource = document.getElementById('data-source-point').value;
+            const variable = document.getElementById('variable-point').value;
+
+            // Build API URL base
+            let apiUrl = '';
+
+            if (dataSource === 'elev' || dataSource === 'sg') {
+                // For static data sources
+                apiUrl = `/climate-data-timeseries/?lat=${selectedPoint.lat}&lon=${selectedPoint.lon}&data_source=${dataSource}&variable=${variable}`;
+            } else {
+                // For time series data
+                const startDate = document.getElementById('start-date').value;
+                const endDate = document.getElementById('end-date').value;
+
+                // Validate dates
+                if (!startDate || !endDate) {
+                    showError('Please select start and end dates.');
+                    return;
+                }
+
+                apiUrl = `/climate-data-timeseries/?lat=${selectedPoint.lat}&lon=${selectedPoint.lon}&start_date=${startDate}&end_date=${endDate}&data_source=${dataSource}&variable=${variable}`;
+            }
+
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error').textContent = '';
+
+            try {
+                // Fetch data
+                const response = await fetch(apiUrl);
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Failed to fetch data');
+                }
+
+                const data = await response.json();
+
+                // Process and display the data
+                if (dataSource === 'elev' || dataSource === 'sg') {
+                    displayStaticData(data, dataSource, variable);
+                } else {
+                    displayTimeSeriesData(data);
+                }
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                // Hide loading
+                document.getElementById('loading').style.display = 'none';
+            }
+        });
+        // Modify the fetch bounding box data button click handler
+            document.getElementById('fetch-bbox-data').addEventListener('click', async function () {
+                // Check if a bounding box is selected
+                if (!bboxCoordinates) {
+                    showError('Please draw a bounding box on the map first.');
+                    return;
+                }
+
+                // Get form values
+                const dataSource = document.getElementById('data-source-bbox').value;
+                const variable = document.getElementById('variable-bbox').value;
+                const isTimeSeries = document.getElementById('bbox-time-series-toggle').checked;
+
+                // Build API URL
+                let apiUrl = '';
+
+                // For static data sources
+                if (dataSource === 'elev' || dataSource === 'sg') {
+                    if (isTimeSeries) {
+                        showError('Time series is not available for static data sources.');
+                        return;
+                    }
+
+                    const dummyDate = '2023-01-01'; // Use a dummy date
+                    apiUrl = `/climate-data-bbox/?min_lat=${bboxCoordinates.min_lat}&min_lon=${bboxCoordinates.min_lon}&max_lat=${bboxCoordinates.max_lat}&max_lon=${bboxCoordinates.max_lon}&date=${dummyDate}&data_source=${dataSource}&variable=${variable}`;
+                } else {
+                    // For time series data sources
+                    if (isTimeSeries) {
+                        // Time series mode
+                        const startDate = document.getElementById('bbox-start-date').value;
+                        const endDate = document.getElementById('bbox-end-date').value;
+
+                        // Validate dates
+                        if (!startDate || !endDate) {
+                            showError('Please select start and end dates.');
+                            return;
+                        }
+
+                        apiUrl = `/climate-data-bbox-timeseries/?min_lat=${bboxCoordinates.min_lat}&min_lon=${bboxCoordinates.min_lon}&max_lat=${bboxCoordinates.max_lat}&max_lon=${bboxCoordinates.max_lon}&start_date=${startDate}&end_date=${endDate}&data_source=${dataSource}&variable=${variable}`;
+                    } else {
+                        // Single date mode
+                        const date = document.getElementById('bbox-date').value;
+
+                        // Validate date
+                        if (!date) {
+                            showError('Please select a date.');
+                            return;
+                        }
+
+                        apiUrl = `/climate-data-bbox/?min_lat=${bboxCoordinates.min_lat}&min_lon=${bboxCoordinates.min_lon}&max_lat=${bboxCoordinates.max_lat}&max_lon=${bboxCoordinates.max_lon}&date=${date}&data_source=${dataSource}&variable=${variable}`;
+                    }
+                }
+
+                // Show loading
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('error').textContent = '';
+
+                try {
+                    // Fetch data
+                    const response = await fetch(apiUrl);
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || 'Failed to fetch data');
+                    }
+
+                    const data = await response.json();
+
+                    // Clear any existing point markers
+                    drawnItems.eachLayer(function (layer) {
+                        if (layer instanceof L.CircleMarker) {
+                            drawnItems.removeLayer(layer);
+                        }
+                    });
+
+                    // Display data based on mode
+                    if (isTimeSeries) {
+                        displayBoundingBoxTimeSeries(data);
+                    } else {
+                        displayBoundingBoxData(data);
+                    }
+                } catch (error) {
+                    showError(error.message);
+                } finally {
+                    // Hide loading
+                    document.getElementById('loading').style.display = 'none';
+                }
+            });
+
+        // // Fetch bounding box data button click handler
+        // document.getElementById('fetch-bbox-data').addEventListener('click', async function () {
+        //     // Check if a bounding box is selected
+        //     if (!bboxCoordinates) {
+        //         showError('Please draw a bounding box on the map first.');
+        //         return;
+        //     }
+
+        //     // Get form values
+        //     const dataSource = document.getElementById('data-source-bbox').value;
+        //     const variable = document.getElementById('variable-bbox').value;
+
+        //     // Build API URL
+        //     let apiUrl = '';
+
+        //     // For static data sources
+        //     if (dataSource === 'elev' || dataSource === 'sg') {
+        //         const dummyDate = '2023-01-01'; // Use a dummy date
+        //         apiUrl = `/climate-data-bbox/?min_lat=${bboxCoordinates.min_lat}&min_lon=${bboxCoordinates.min_lon}&max_lat=${bboxCoordinates.max_lat}&max_lon=${bboxCoordinates.max_lon}&date=${dummyDate}&data_source=${dataSource}&variable=${variable}`;
+        //     } else {
+        //         // For time series data sources
+        //         const date = document.getElementById('bbox-date').value;
+
+        //         // Validate date
+        //         if (!date) {
+        //             showError('Please select a date.');
+        //             return;
+        //         }
+
+        //         apiUrl = `/climate-data-bbox/?min_lat=${bboxCoordinates.min_lat}&min_lon=${bboxCoordinates.min_lon}&max_lat=${bboxCoordinates.max_lat}&max_lon=${bboxCoordinates.max_lon}&date=${date}&data_source=${dataSource}&variable=${variable}`;
+        //     }
+
+        //     // Show loading
+        //     document.getElementById('loading').style.display = 'block';
+        //     document.getElementById('error').textContent = '';
+
+        //     try {
+        //         // Fetch data
+        //         const response = await fetch(apiUrl);
+
+        //         if (!response.ok) {
+        //             const errorData = await response.json();
+        //             throw new Error(errorData.detail || 'Failed to fetch data');
+        //         }
+
+        //         const data = await response.json();
+
+        //         // Clear any existing point markers
+        //         drawnItems.eachLayer(function (layer) {
+        //             if (layer instanceof L.CircleMarker) {
+        //                 drawnItems.removeLayer(layer);
+        //             }
+        //         });
+
+        //         // Display bounding box data
+        //         displayBoundingBoxData(data);
+        //     } catch (error) {
+        //         showError(error.message);
+        //     } finally {
+        //         // Hide loading
+        //         document.getElementById('loading').style.display = 'none';
+        //     }
+        // });
+
+        // Clear point selection button click handler
+        document.getElementById('clear-point-selection').addEventListener('click', function () {
+            // Clear selected point
+            selectedPoint = null;
+
+            // Remove marker if exists
+            if (selectedMarker) {
+                map.removeLayer(selectedMarker);
+                selectedMarker = null;
+            }
+
+            // Reset UI
+            document.getElementById('selected-point').innerHTML = '<p>Click on the map to select a point.</p>';
+
+            // Clear chart
+            // Clear chart
+            if (timeSeriesChart) {
+                timeSeriesChart.destroy();
+                timeSeriesChart = null;
+            }
+        });
+
+        // Clear bbox selection button click handler
+        document.getElementById('clear-bbox-selection').addEventListener('click', function () {
+            // Clear bounding box selection
+            bboxCoordinates = null;
+
+            // Remove all drawn items
+            drawnItems.clearLayers();
+
+            // Reset UI
+            document.getElementById('selected-bbox').innerHTML = '<p>Use the rectangle tool to draw a bounding box on the map.</p>';
+            document.getElementById('points-info').style.display = 'none';
+
+            // Clear chart
+            if (timeSeriesChart) {
+                timeSeriesChart.destroy();
+                timeSeriesChart = null;
+            }
+        });
+
+        // Add a new function to display time series data for multiple points
+            function displayBoundingBoxTimeSeries(data) {
+                // Store the data
+                pointsData = data;
+                const points = data.points;
+
+                if (!points || points.length === 0) {
+                    showError('No data points found within the bounding box.');
+                    return;
+                }
+
+                // Add markers for each point on the map
+                points.forEach((point, index) => {
+                    // Calculate average value for each point
+                    const values = point.values.map(v => v.value);
+                    const avgValue = values.reduce((a, b) => a + b, 0) / values.length;
+
+                    const marker = L.circleMarker([point.lat, point.lon], {
+                        radius: 5,
+                        fillColor: getColorForValue(avgValue),
+                        color: '#000',
+                        weight: 1,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    }).addTo(drawnItems);
+
+                    marker.bindPopup(`
+            <strong>Position:</strong> ${point.lat}, ${point.lon}<br>
+            <strong>Average value:</strong> ${avgValue.toFixed(2)} ${getUnitLabel(data.variable, data.data_source)}<br>
+            <strong>Number of time steps:</strong> ${point.values.length}
+        `);
+
+                    // Add click event to show this point's time series
+                    marker.on('click', function () {
+                        showTimeSeriesForPoint(data, index);
+                    });
+                });
+
+                // Calculate overall statistics across all points and time steps
+                let allValues = [];
+                points.forEach(point => {
+                    point.values.forEach(v => {
+                        allValues.push(v.value);
+                    });
+                });
+
+                const min = Math.min(...allValues);
+                const max = Math.max(...allValues);
+                const avg = allValues.reduce((a, b) => a + b, 0) / allValues.length;
+
+                // Update points info
+                document.getElementById('points-summary').innerHTML = `
+        <p><strong>Total sample points:</strong> ${points.length}</p>
+        <p><strong>Time period:</strong> ${data.start_date} to ${data.end_date}</p>
+        <p><strong>Min value across all data:</strong> ${min.toFixed(2)} ${getUnitLabel(data.variable, data.data_source)}</p>
+        <p><strong>Max value across all data:</strong> ${max.toFixed(2)} ${getUnitLabel(data.variable, data.data_source)}</p>
+        <p><strong>Average value across all data:</strong> ${avg.toFixed(2)} ${getUnitLabel(data.variable, data.data_source)}</p>
+        <p><em>Click on a point marker to see its time series.</em></p>
+    `;
+                document.getElementById('points-info').style.display = 'block';
+
+                // Show the first point's time series by default
+                if (points.length > 0) {
+                    showTimeSeriesForPoint(data, 0);
+                }
+            }
+        // Function to show time series for a specific point
+            function showTimeSeriesForPoint(data, pointIndex) {
+                const point = data.points[pointIndex];
+
+                // Create a context for the chart
+                const ctx = document.getElementById('timeSeriesChart').getContext('2d');
+
+                // Destroy previous chart if exists
+                if (timeSeriesChart) {
+                    timeSeriesChart.destroy();
+                }
+
+                // Prepare chart data
+                const chartLabels = [];
+                const chartData = [];
+
+                // Sort values by date
+                const sortedValues = [...point.values].sort((a, b) => {
+                    if (a.date < b.date) return -1;
+                    if (a.date > b.date) return 1;
+                    return 0;
+                });
+
+                // Process values
+                sortedValues.forEach(entry => {
+                    chartLabels.push(entry.date);
+                    chartData.push(entry.value);
+                });
+
+                // Create new chart
+                timeSeriesChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: chartLabels,
+                        datasets: [{
+                            label: getVariableLabel(data.variable, data.data_source),
+                            data: chartData,
+                            borderColor: getChartColor(data.variable),
+                            backgroundColor: getChartColor(data.variable, 0.1),
+                            tension: 0.1,
+                            pointRadius: 3,
+                            pointHoverRadius: 5
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                title: {
+                                    display: true,
+                                    text: getUnitLabel(data.variable, data.data_source)
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: getCadenceLabel(data.cadence)
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: `${getVariableLabel(data.variable, data.data_source)} at Lat: ${point.lat}, Lon: ${point.lon}`
+                            },
+                            legend: {
+                                display: true
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function (context) {
+                                        return `${context.dataset.label}: ${context.raw} ${getUnitLabel(data.variable, data.data_source)}`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        // Function to display time series data for a single point
+        function displayTimeSeriesData(data) {
+            // Prepare chart data
+            const chartLabels = [];
+            const chartData = [];
+
+            // Process values based on cadence
+            data.values.forEach(entry => {
+                if (entry.value !== null) {
+                    // Format date label based on cadence
+                    let dateLabel;
+                    if (data.cadence === 'monthly') {
+                        dateLabel = `${entry.year}-${entry.month.toString().padStart(2, '0')}`;
+                    } else {
+                        dateLabel = entry.date;
+                    }
+
+                    chartLabels.push(dateLabel);
+                    chartData.push(entry.value);
+                }
+            });
+
+            // Create chart
+            const ctx = document.getElementById('timeSeriesChart').getContext('2d');
+
+            // Destroy previous chart if exists
+            if (timeSeriesChart) {
+                timeSeriesChart.destroy();
+            }
+
+            // Create new chart
+            timeSeriesChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartLabels,
+                    datasets: [{
+                        label: getVariableLabel(data.variable, data.data_source),
+                        data: chartData,
+                        borderColor: getChartColor(data.variable),
+                        backgroundColor: getChartColor(data.variable, 0.1),
+                        tension: 0.1,
+                        pointRadius: 3,
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: getUnitLabel(data.variable, data.data_source)
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: getCadenceLabel(data.cadence)
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${getVariableLabel(data.variable, data.data_source)} at Lat: ${data.lat}, Lon: ${data.lon}`
+                        },
+                        legend: {
+                            display: true
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    return `${context.dataset.label}: ${context.raw} ${getUnitLabel(data.variable, data.data_source)}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Function to display static data for a single point
+        function displayStaticData(data, dataSource, variable) {
+            // Create a context for the chart
+            const ctx = document.getElementById('timeSeriesChart').getContext('2d');
+
+            // Destroy previous chart if exists
+            if (timeSeriesChart) {
+                timeSeriesChart.destroy();
+            }
+
+            // For static data, create a bar chart showing the value
+            timeSeriesChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: [getVariableLabel(variable, dataSource)],
+                    datasets: [{
+                        label: getVariableLabel(variable, dataSource),
+                        data: [data.values[0].value],
+                        backgroundColor: getChartColor(variable, 0.6),
+                        borderColor: getChartColor(variable),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: getUnitLabel(variable, dataSource)
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${getVariableLabel(variable, dataSource)} at Lat: ${data.lat}, Lon: ${data.lon}`
+                        },
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    return `${context.dataset.label}: ${context.raw} ${getUnitLabel(variable, dataSource)}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Function to display bounding box data (multiple points)
+        function displayBoundingBoxData(data) {
+            // Store the data
+            pointsData = data;
+            const points = data.points;
+
+            if (!points || points.length === 0) {
+                showError('No data points found within the bounding box.');
+                return;
+            }
+
+            // Add markers for each point on the map
+            points.forEach(point => {
+                const marker = L.circleMarker([point.lat, point.lon], {
+                    radius: 5,
+                    fillColor: getColorForValue(point.value),
+                    color: '#000',
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                }).addTo(drawnItems);
+
+                marker.bindPopup(`
+                    <strong>Position:</strong> ${point.lat}, ${point.lon}<br>
+                    <strong>Value:</strong> ${point.value.toFixed(2)} ${getUnitLabel(data.variable, data.data_source)}
+                `);
+            });
+
+            // Calculate statistics
+            const values = points.map(p => p.value);
+            const min = Math.min(...values);
+            const max = Math.max(...values);
+            const sum = values.reduce((a, b) => a + b, 0);
+            const avg = sum / values.length;
+
+            // Update points info
+            document.getElementById('points-summary').innerHTML = `
+                <p><strong>Total sample points:</strong> ${points.length}</p>
+                <p><strong>Min value:</strong> ${min.toFixed(2)} ${getUnitLabel(data.variable, data.data_source)}</p>
+                <p><strong>Max value:</strong> ${max.toFixed(2)} ${getUnitLabel(data.variable, data.data_source)}</p>
+                <p><strong>Average value:</strong> ${avg.toFixed(2)} ${getUnitLabel(data.variable, data.data_source)}</p>
+            `;
+            document.getElementById('points-info').style.display = 'block';
+
+            // Create a context for the chart
+            const ctx = document.getElementById('timeSeriesChart').getContext('2d');
+
+            // Destroy previous chart if exists
+            if (timeSeriesChart) {
+                timeSeriesChart.destroy();
+            }
+
+            // Create a bar chart showing all points
+            timeSeriesChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: points.map((_, i) => `Point ${i + 1}`),
+                    datasets: [{
+                        label: getVariableLabel(data.variable, data.data_source),
+                        data: points.map(p => p.value),
+                        backgroundColor: points.map(p => getColorForValue(p.value, 0.7)),
+                        borderColor: points.map(p => getColorForValue(p.value)),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: getUnitLabel(data.variable, data.data_source)
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${getVariableLabel(data.variable, data.data_source)} Values in Bounding Box`
+                        },
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    const point = points[context.dataIndex];
+                                    return [
+                                        `Value: ${point.value.toFixed(2)} ${getUnitLabel(data.variable, data.data_source)}`,
+                                        `Lat: ${point.lat}, Lon: ${point.lon}`
+                                    ];
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Helper function to get color based on value
+        function getColorForValue(value, alpha = 1) {
+            // Normalize value to 0-1 range (assuming range from -50 to 50)
+            // Adjust this function based on your data's typical ranges
+            const normalizedValue = (value + 50) / 100;
+            const hue = (1 - Math.min(Math.max(normalizedValue, 0), 1)) * 240; // 0 = red (hot), 240 = blue (cold)
+            return `hsla(${hue}, 100%, 50%, ${alpha})`;
+        }
+
+        // Helper functions
+        function addOption(select, value, text) {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = text;
+            select.appendChild(option);
+        }
+
+        function showError(message) {
+            document.getElementById('error').textContent = message;
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function getChartColor(variable, alpha = 1) {
+            const colors = {
+                'prec': `rgba(0, 119, 190, ${alpha})`,
+                'chirps': `rgba(0, 119, 190, ${alpha})`,
+                'tmax': `rgba(255, 69, 0, ${alpha})`,
+                'tmin': `rgba(30, 144, 255, ${alpha})`,
+                'spei': `rgba(50, 205, 50, ${alpha})`,
+                'et': `rgba(128, 0, 128, ${alpha})`,
+                'elev': `rgba(139, 69, 19, ${alpha})`,
+                'bdod': `rgba(165, 42, 42, ${alpha})`,
+                'cec': `rgba(255, 140, 0, ${alpha})`,
+                'cfvo': `rgba(128, 128, 0, ${alpha})`,
+                'clay': `rgba(210, 180, 140, ${alpha})`,
+                'nitrogen': `rgba(0, 128, 0, ${alpha})`,
+                'ocd': `rgba(0, 0, 139, ${alpha})`,
+                'ocs': `rgba(72, 61, 139, ${alpha})`,
+                'phh2o': `rgba(186, 85, 211, ${alpha})`,
+                'sand': `rgba(240, 230, 140, ${alpha})`,
+                'silt': `rgba(189, 183, 107, ${alpha})`,
+                'soc': `rgba(85, 107, 47, ${alpha})`,
+                'wv0010': `rgba(100, 149, 237, ${alpha})`,
+                'wv0030': `rgba(70, 130, 180, ${alpha})`,
+                'wv1500': `rgba(25, 25, 112, ${alpha})`
+            };
+
+            return colors[variable] || `rgba(100, 100, 100, ${alpha})`;
+        }
+
+        function getVariableLabel(variable, dataSource) {
+            const labels = {
+                'prec': 'Precipitation',
+                'chirps': 'Precipitation',
+                'tmax': 'Maximum Temperature',
+                'tmin': 'Minimum Temperature',
+                'spei': 'SPEI',
+                'et': 'Evapotranspiration',
+                'elev': 'Elevation',
+                'bdod': 'Bulk Density',
+                'cec': 'Cation Exchange Capacity',
+                'cfvo': 'Coarse Fragments Volumetric',
+                'clay': 'Clay Content',
+                'nitrogen': 'Nitrogen',
+                'ocd': 'Organic Carbon Density',
+                'ocs': 'Organic Carbon Stock',
+                'phh2o': 'pH in H2O',
+                'sand': 'Sand Content',
+                'silt': 'Silt Content',
+                'soc': 'Soil Organic Carbon',
+                'wv0010': 'Water Vapor Content at 10cm',
+                'wv0030': 'Water Vapor Content at 30cm',
+                'wv1500': 'Water Vapor Content at 1500cm',
+                // TerraClim variables
+                'aet': 'Actual Evapotranspiration',
+                'def': 'Water Deficit',
+                'pdsi': 'Palmer Drought Severity Index',
+                'pet': 'Potential Evapotranspiration',
+                'ppt': 'Precipitation',
+                'q': 'Runoff',
+                'soil': 'Soil Moisture',
+                'srad': 'Solar Radiation',
+                'vap': 'Vapor Pressure',
+                'vpd': 'Vapor Pressure Deficit',
+                'ws': 'Wind Speed',
+                // NASA POWER variables
+                'allsky_sfc_sw_dwn': 'All-Sky Surface SW Down'
+                // Add more as needed
+            };
+
+            return labels[variable] || variable;
+        }
+
+        function getUnitLabel(variable, dataSource) {
+            if (variable === 'prec' || variable === 'chirps' || variable === 'et' || variable === 'ppt' || variable === 'aet' || variable === 'pet' || variable === 'q') {
+                return 'mm';
+            } else if (variable === 'tmax' || variable === 'tmin') {
+                return '°C';
+            } else if (variable === 'spei' || variable === 'pdsi') {
+                return 'index';
+            } else if (variable === 'elev') {
+                return 'm';
+            } else if (variable === 'bdod') {
+                return 'kg/dm³';
+            } else if (variable === 'cec') {
+                return 'cmolc/kg';
+            } else if (variable === 'cfvo' || variable === 'clay' || variable === 'sand' || variable === 'silt') {
+                return '%';
+            } else if (variable === 'nitrogen' || variable === 'soc') {
+                return 'g/kg';
+            } else if (variable === 'ocd') {
+                return 'kg/dm³';
+            } else if (variable === 'ocs') {
+                return 't/ha';
+            } else if (variable === 'phh2o') {
+                return 'pH';
+            } else if (variable === 'srad') {
+                return 'W/m²';
+            } else if (variable === 'vap' || variable === 'vpd') {
+                return 'kPa';
+            } else if (variable === 'ws') {
+                return 'm/s';
+            } else if (variable.includes('allsky') || variable.includes('clrsky') || variable.includes('toa')) {
+                return 'W/m²';
+            }
+
+            return '';
+        }
+
+        function getCadenceLabel(cadence) {
+            const labels = {
+                'daily': 'Date',
+                '8day': 'Date',
+                'monthly': 'Month',
+                'aggregated': 'Data Point',
+                'static': 'Data Point'
+            };
+
+            return labels[cadence] || 'Date';
+        }
+
+            // Update the setDefaultDates function to include bounding box time series dates
+            function setDefaultDates() {
+                const today = new Date();
+                const sixMonthsAgo = new Date();
+                sixMonthsAgo.setMonth(today.getMonth() - 6);
+
+                document.getElementById('end-date').value = formatDate(today);
+                document.getElementById('start-date').value = formatDate(sixMonthsAgo);
+                document.getElementById('bbox-date').value = formatDate(today);
+                document.getElementById('bbox-end-date').value = formatDate(today);
+                document.getElementById('bbox-start-date').value = formatDate(sixMonthsAgo);
+            }
+
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+
+            return `${year}-${month}-${day}`;
+        }
+
+        // Initialize
+        setDefaultDates();
+
+        // Draw the initial bounding box on the map
+        const initialBboxRectangle = L.rectangle(initialBbox, {
+            color: "#ff7800",
+            weight: 2,
+            fillOpacity: 0.1
+        }).addTo(map);
+    </script>
+</body>
+
+</html>
