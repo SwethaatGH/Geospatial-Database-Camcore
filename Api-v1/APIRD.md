@@ -8,6 +8,7 @@
 5. Run `pip install -r .\app\requirements.text` to your venv
 6. Start dev server: `uvicorn app.main:app --reload` 
 7. To obtain temporary URL use ngrok 
+`ngrok http 8000 --domain=stingray-oriented-optionally.ngrok-free.app`
 
 ## Checklist:
 - [ ] Scale Factors Add 
@@ -17,3 +18,4 @@
 - [ ] Add Soil Grids
 - [ ] Add elev
 - [ ] Add NASA Power
+
