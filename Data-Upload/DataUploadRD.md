@@ -14,3 +14,5 @@
 Run all batch files in command line 
 
 **Database with Worldclim, ET, CHIRPS, SPEI, Elevation, Terraclim, Nasa Power is 1.17 TB**
+
+**CSV Uploaded using command:** `raster2pgsql -s 4326 -I -C -M -t 128x128 "%%f" public.table_name | psql -U username -d dbname -h host_name! -p !port_number`

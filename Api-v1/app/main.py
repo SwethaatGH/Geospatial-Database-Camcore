@@ -4,25 +4,22 @@ from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, Query, File, UploadFile, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy import text
-from app.database import get_db
+from sqlalchemy.orm import sessionmaker
+from .database import get_db
 from datetime import datetime, timedelta
 from enum import Enum
 import os, shutil, subprocess, uuid, json
 from pathlib import Path
 import asyncio
+import os
+from .config import settings
+
 
 # Ensure necessary directories exist
 os.makedirs("../Csv-Creator/uploads", exist_ok=True)
 os.makedirs("../Csv-Creator/processed", exist_ok=True)
-
-# Define your Enums (unchanged)
-from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
-import os
-
 
 # Update DataSource and Variable Enums
 class DataSource(str, Enum):

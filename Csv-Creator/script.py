@@ -5,9 +5,35 @@ import time, json, argparse, hashlib, os
 import asyncio
 import sys
 
-# Adjust the Python path so that we can import modules from Api-v1
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "Api-v1"))
+# # Add the site-packages from the virtual environment to the Python path
+venv_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Api-v1", "venv"))
+if sys.platform == 'win32':
+    site_packages = os.path.join(venv_path, "Lib", "site-packages")
+else:
+    # Adjust for Python version if needed
+    site_packages = os.path.join(venv_path, "lib", "python3.9", "site-packages")
 
+if os.path.exists(site_packages):
+    sys.path.insert(0, site_packages)
+    print(f"Added site-packages to path: {site_packages}")
+else:
+    print(f"Site-packages directory not found at: {site_packages}")
+
+# Also add the Api-v1 directory to the path
+api_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Api-v1"))
+sys.path.insert(0, api_path)
+print(f"Added Api-v1 to path: {api_path}")
+
+# Add detailed debugging
+try:
+    import sqlalchemy
+    print(f"SQLAlchemy found at: {sqlalchemy.__file__}, version: {sqlalchemy.__version__}")
+except ImportError as e:
+    print(f"SQLAlchemy import failed: {e}")
+    print("Python path:")
+    for p in sys.path:
+        print(f"  - {p}")
+        
 # Import shared business logic and dependencies
 from app.database import get_db  # Assumes you have your asynchronous DB setup here.
 from app.main import DataSource, Variable  # Import your enums
