@@ -70,6 +70,7 @@ class Variable(str, Enum):
     VAP = "vap"         # Vapor Pressure
     VPD = "vpd"         # Vapor Pressure Deficit
     WS = "ws"           # Wind Speed
+    TMIN = "tmin"       # Minimum temperature
     
     # NASA POWER variables
     AIRMASS = "airmass"
