@@ -1,27 +1,27 @@
-# main.py
 import time
-from typing import Optional
+import math
+from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, Depends, HTTPException, Query, File, UploadFile, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
-from sqlalchemy.orm import sessionmaker
 from .database import get_db
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from enum import Enum
 import os, shutil, subprocess, uuid, json
 from pathlib import Path
-import asyncio
-import os
 from .config import settings
+from shapely.geometry import box
+from shapely import wkt as shapely_wkt
+from fastapi.middleware.cors import CORSMiddleware
 
 
 # Ensure necessary directories exist
 os.makedirs("../Csv-Creator/uploads", exist_ok=True)
 os.makedirs("../Csv-Creator/processed", exist_ok=True)
 
-# Update DataSource and Variable Enums
+# Data source and variable enums
 class DataSource(str, Enum):
     WORLDCLIM = "wc"
     SPEI = "spei"
@@ -31,95 +31,8 @@ class DataSource(str, Enum):
     SOILGRIDS = "sg"
     TERRACLIM = "tc" 
     NASAPOWER = "np"
+    ERA5 = "era5"
 
-class Variable(str, Enum):
-    # Add your variables (truncated for brevity)
-    PRECIPITATION = "prec"
-    TMAX = "tmax"
-    TMIN = "tmin"
-    SPEI = "spei"
-    ET = "et"
-    CHIRPS = "chirps"
-
-    # SoilGrids variables
-    ELEVATION = "elev"  # Elevation
-    BDOD = "bdod"       # Bulk density
-    CEC = "cec"         # Cation exchange capacity
-    CFVO = "cfvo"       # Coarse fragments volumetric
-    CLAY = "clay"       # Clay content
-    NITROGEN = "nitrogen" # Nitrogen
-    OCD = "ocd"         # Organic carbon density
-    OCS = "ocs"         # Organic carbon stock
-    PHH2O = "phh2o"     # pH in H2O
-    SAND = "sand"       # Sand content
-    SILT = "silt"       # Silt content
-    SOC = "soc"         # Soil organic carbon
-    WV0010 = "wv0010"   # Water vapor content at 10cm depth
-    WV0030 = "wv0030"   # Water vapor content at 30cm depth
-    WV1500 = "wv1500"   # Water vapor content at 1500cm depth
-    
-    # TerraClim variables
-    AET = "aet"         # Actual Evapotranspiration
-    DEF = "def"         # Water Deficit
-    PDSI = "pdsi"       # Palmer Drought Severity Index
-    PET = "pet"         # Potential Evapotranspiration
-    PPT = "ppt"         # Precipitation
-    Q = "q"             # Runoff
-    SOIL = "soil"       # Soil Moisture
-    SRAD = "srad"       # Solar Radiation
-    VAP = "vap"         # Vapor Pressure
-    VPD = "vpd"         # Vapor Pressure Deficit
-    WS = "ws"           # Wind Speed
-    
-    # NASA POWER variables
-    AIRMASS = "airmass"
-    ALLSKY_KT = "allsky_kt"
-    ALLSKY_NKT = "allsky_nkt"
-    ALLSKY_SFC_LW_DWN = "allsky_sfc_lw_dwn"
-    ALLSKY_SFC_LW_UP = "allsky_sfc_lw_up"
-    ALLSKY_SFC_PAR_DIFF = "allsky_sfc_par_diff"
-    ALLSKY_SFC_PAR_DIRH = "allsky_sfc_par_dirh"
-    ALLSKY_SFC_PAR_TOT = "allsky_sfc_par_tot"
-    ALLSKY_SFC_SW_DIFF = "allsky_sfc_sw_diff"
-    ALLSKY_SFC_SW_DIRH = "allsky_sfc_sw_dirh"
-    ALLSKY_SFC_SW_DNI = "allsky_sfc_sw_dni"
-    ALLSKY_SFC_SW_DWN = "allsky_sfc_sw_dwn"
-    ALLSKY_SFC_SW_UP = "allsky_sfc_sw_up"
-    ALLSKY_SFC_UV_INDEX = "allsky_sfc_uv_index"
-    ALLSKY_SFC_UVA = "allsky_sfc_uva"
-    ALLSKY_SFC_UVB = "allsky_sfc_uvb"
-    ALLSKY_SRF_ALB = "allsky_srf_alb"
-    AOD_55 = "aod_55"
-    AOD_55_ADJ = "aod_55_adj"
-    AOD_84 = "aod_84"
-    CLOUD_AMT = "cloud_amt"
-    CLOUD_AMT_DAY = "cloud_amt_day"
-    CLOUD_AMT_NIGHT = "cloud_amt_night"
-    CLOUD_OD = "cloud_od"
-    CLRSKY_DAYS = "clrsky_days"
-    CLRSKY_KT = "clrsky_kt"
-    CLRSKY_NKT = "clrsky_nkt"
-    CLRSKY_SFC_LW_DWN = "clrsky_sfc_lw_dwn"
-    CLRSKY_SFC_LW_UP = "clrsky_sfc_lw_up"
-    CLRSKY_SFC_PAR_DIFF = "clrsky_sfc_par_diff"
-    CLRSKY_SFC_PAR_DIRH = "clrsky_sfc_par_dirh"
-    CLRSKY_SFC_PAR_TOT = "clrsky_sfc_par_tot"
-    CLRSKY_SFC_SW_DIFF = "clrsky_sfc_sw_diff"
-    CLRSKY_SFC_SW_DIRH = "clrsky_sfc_sw_dirh"
-    CLRSKY_SFC_SW_DNI = "clrsky_sfc_sw_dni"
-    CLRSKY_SFC_SW_DWN = "clrsky_sfc_sw_dwn"
-    CLRSKY_SFC_SW_UP = "clrsky_sfc_sw_up"
-    CLRSKY_SRF_ALB = "clrsky_srf_alb"
-    MIDDAY_INSOL = "midday_insol"
-    ORIGINAL_ALLSKY_SFC_SW_DIFF = "original_allsky_sfc_sw_diff"
-    ORIGINAL_ALLSKY_SFC_SW_DIRH = "original_allsky_sfc_sw_dirh"
-    PSH = "psh"
-    PW = "pw"
-    SRF_ALB_ADJ = "srf_alb_adj"
-    TOA_SW_DNI = "toa_sw_dni"
-    TOA_SW_DWN = "toa_sw_dwn"
-    TS_ADJ = "ts_adj"
-    
 class Cadence(str, Enum):
     DAILY = "daily"
     EIGHT_DAY = "8day"
@@ -127,50 +40,102 @@ class Cadence(str, Enum):
     STATIC = "static"
     AGGREGATED = "aggregated"
 
-# Helper functions used also by the shared module.
-def get_table_name(data_source: DataSource, variable: Variable, year: int = None, month: int = None, day: int = None):
-    if data_source == DataSource.WORLDCLIM:
-        return f"{data_source.value}_{variable.value}_{year}_{month:02d}"
-    elif data_source == DataSource.SPEI:
-        return f"{data_source.value}_{year}_{month:02d}"
-    elif data_source == DataSource.CHIRPS:
-        if day is None:
-            raise ValueError("Day is required for CHIRPS data source")
-        return f"{data_source.value}_{year}_{month:02d}_{day:02d}"
-    elif data_source == DataSource.ET:
-        if day is None:
-            raise ValueError("Day is required for ET data source")
-        return f"{data_source.value}_{year}_{month:02d}_{day:02d}"
-    elif data_source == DataSource.ELEVATION:
-        return "elev"
-    elif data_source == DataSource.SOILGRIDS:
-        return f"sg_{variable.value}"
-    elif data_source == DataSource.TERRACLIM:
-        return f"terraclim_{variable.value}_{year}_{month:02d}"
-    elif data_source == DataSource.NASAPOWER:
-        return f"np_{variable.value}_{year}_{month:02d}"
-    else:
-        raise ValueError(f"Unknown data source: {data_source}")
+# Dictionary mapping data sources to their cadence
+DATA_SOURCE_CADENCE = {
+    DataSource.WORLDCLIM: Cadence.MONTHLY,
+    DataSource.SPEI: Cadence.MONTHLY,
+    DataSource.CHIRPS: Cadence.DAILY,
+    DataSource.ET: Cadence.EIGHT_DAY,
+    DataSource.ELEVATION: Cadence.STATIC,
+    DataSource.SOILGRIDS: Cadence.AGGREGATED,
+    DataSource.TERRACLIM: Cadence.MONTHLY,
+    DataSource.NASAPOWER: Cadence.MONTHLY,
+    DataSource.ERA5: Cadence.DAILY,
+}
 
-def get_cadence_for_data_source(data_source: DataSource):
-    if data_source in [DataSource.WORLDCLIM, DataSource.SPEI, DataSource.TERRACLIM, DataSource.NASAPOWER]:
-        return Cadence.MONTHLY
-    elif data_source == DataSource.CHIRPS:
-        return Cadence.DAILY
-    elif data_source == DataSource.ET:
-        return Cadence.EIGHT_DAY
-    elif data_source == DataSource.ELEVATION:
-        return Cadence.STATIC
-    elif data_source == DataSource.SOILGRIDS:
-        return Cadence.AGGREGATED
-    else:
-        raise ValueError(f"Unknown data source: {data_source}")
+# Data source table mapping
+DATA_SOURCE_TABLES = {
+    DataSource.WORLDCLIM: "wc_data",
+    DataSource.SPEI: "spei_data",
+    DataSource.CHIRPS: "chirps_data",
+    DataSource.ET: "et_data",
+    DataSource.ELEVATION: "elev_data",
+    DataSource.TERRACLIM: "terraclim_data",
+    DataSource.NASAPOWER: "np_data",
+    DataSource.SOILGRIDS: "sg_data",
+    DataSource.ERA5: "era5_data"
+}
 
-# Import the shared logic:
-from .climate_data_service import get_climate_data_timeseries_logic
+# Available variables per data source
+AVAILABLE_VARIABLES = {
+    DataSource.WORLDCLIM: ["prec", "tmax", "tmin"],
+    DataSource.SPEI: ["spei"],
+    DataSource.CHIRPS: ["chirps"],
+    DataSource.ET: ["et"],
+    DataSource.ELEVATION: ["elev"],
+    DataSource.SOILGRIDS: ["bdod", "cec", "cfvo", "clay", "nitrogen", "ocd", "ocs", "phh2o", "sand", "silt", "soc", "wv0010", "wv0030", "wv1500"],
+    DataSource.TERRACLIM: ["aet", "def", "pdsi", "pet", "ppt", "q", "soil", "srad", "tmin", "vap", "vpd", "ws"],
+    DataSource.NASAPOWER: ["airmass", "allsky_kt", "allsky_nkt", "allsky_sfc_lw_dwn", "allsky_sfc_lw_up", "allsky_sfc_par_diff", 
+                         "allsky_sfc_par_dirh", "allsky_sfc_par_tot", "allsky_sfc_sw_diff", "allsky_sfc_sw_dirh", "allsky_sfc_sw_dni", 
+                         "allsky_sfc_sw_dwn", "allsky_sfc_sw_up", "allsky_sfc_uv_index", "allsky_sfc_uva", "allsky_sfc_uvb", 
+                         "allsky_srf_alb", "aod_55", "aod_55_adj", "aod_84", "cloud_amt", "cloud_amt_day", "cloud_amt_night", 
+                         "cloud_od", "clrsky_days", "clrsky_kt", "clrsky_nkt", "clrsky_sfc_lw_dwn", "clrsky_sfc_lw_up", 
+                         "clrsky_sfc_par_diff", "clrsky_sfc_par_dirh", "clrsky_sfc_par_tot", "clrsky_sfc_sw_diff", "clrsky_sfc_sw_dirh", 
+                         "clrsky_sfc_sw_dni", "clrsky_sfc_sw_dwn", "clrsky_sfc_sw_up", "clrsky_srf_alb", "midday_insol", 
+                         "original_allsky_sfc_sw_diff", "original_allsky_sfc_sw_dirh", "psh", "pw", "srf_alb_adj", "toa_sw_dni", 
+                         "toa_sw_dwn", "ts_adj"],
+    DataSource.ERA5: ["evaptrans", "latheat", "netsolrad", "press", "sktemp", "sotemp1", "sotemp2", "sotemp3", "temp", 
+                     "totprec", "uwind", "vwind", "volsowat1", "volsowat12", "volsowat13"]
+}
 
+# Data sources that use var_name column
+DATASOURCES_WITH_VARIABLES = [
+    DataSource.WORLDCLIM,
+    DataSource.TERRACLIM,
+    DataSource.NASAPOWER,
+    DataSource.ERA5,
+]
+
+STATIC_DATA_SOURCES = [
+    DataSource.ELEVATION,
+    DataSource.SOILGRIDS,
+]
+
+# Helper function to check if a table exists
+async def table_exists(db: AsyncSession, table_name: str) -> bool:
+    """Check if a table exists in the database."""
+    check_query = text(f"""
+        SELECT EXISTS (
+            SELECT FROM information_schema.tables 
+            WHERE table_name = '{table_name}'
+        );
+    """)
+    result = await db.execute(check_query)
+    return result.scalar()
+
+# Initialize FastAPI app
 app = FastAPI(title="Camcore Database API")
+  
+  
+ # Add CORS middleware
+origins = [
+    "http://localhost:3000",    # React default development server
+    "http://localhost:5173",    # Vite default development server
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+    # Add your production domains when ready
+    # "https://yourdomain.com",
+]
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,      # List of allowed origins
+    allow_credentials=True,     # Allow cookies to be sent with requests
+    allow_methods=["*"],        # Allow all methods
+    allow_headers=["*"],        # Allow all headers
+) 
+  
+    
 @app.get("/")
 async def root():
     return {
@@ -183,7 +148,8 @@ async def root():
             "elev": "Elevation (static)",
             "sg": "SoilGrids (static soil properties)",
             "tc": "TerraClim (monthly climate data)",
-            "np": "NASA POWER (monthly climate and solar data)"
+            "np": "NASA POWER (monthly climate and solar data)",
+            "era5": "ERA5 climate data",
         }
     }
 
@@ -193,552 +159,415 @@ async def get_climate_data_timeseries(
     lon: float = Query(..., description="Longitude coordinate"),
     start_date: Optional[str] = Query(None, description="Start date in YYYY-MM-DD format"),
     end_date: Optional[str] = Query(None, description="End date in YYYY-MM-DD format"),
-    data_source: DataSource = Query(DataSource.WORLDCLIM, description="Data source (wc, spei, chirps, et, elev, sg)"),
-    variable: Optional[Variable] = Query(None, description="Climate variable"),
+    variable: Optional[str] = Query(None, description="Specific variable to query (for SoilGrids only)"),
+    data_source: DataSource = Query(DataSource.WORLDCLIM, description="Data source"),
     db: AsyncSession = Depends(get_db)
 ):
-    # For time series data sources, require dates.
+    """
+    Get climate data time series for a specific location and time period.
+    Uses the new partitioned database structure.
+    """
+    # Check if start_date and end_date are required based on data source
     if data_source not in [DataSource.ELEVATION, DataSource.SOILGRIDS]:
         if start_date is None or end_date is None:
             raise HTTPException(status_code=400, detail="start_date and end_date are required for time series data")
-    
-    result = await get_climate_data_timeseries_logic(lat, lon, start_date, end_date, data_source, variable, db)
-    return result
-
-# (Other endpoints and CSV generator endpoint remain largely the same.)
-# For brevity, the rest of your endpoints (static file serving, CSV generator post, etc.) remain unchanged.
-
-@app.get("/CSVGenerator", response_class=HTMLResponse)
-async def get_csv_generator():
-    with open("static/csv_generator.html", "r") as f:
-        return f.read()
-
-def wait_for_file(path, timeout=60):
-    waited = 0
-    while not path.exists() and waited < timeout:
-        time.sleep(1)
-        waited += 1
-    return path.exists()
-
-@app.post("/api/process-csv")
-async def process_csv(
-    file: UploadFile = File(...),
-    option: str = Form(...)
-):
-    print("Current Working Directory:", os.getcwd())
-    # (set up directories and save file, as you already do)
-    job_id = str(uuid.uuid4())
-    upload_dir = Path(f"../Csv-Creator/uploads/{job_id}")
-    processed_dir = Path(f"../Csv-Creator/processed/{job_id}")
-    os.makedirs(upload_dir, exist_ok=True)
-    os.makedirs(processed_dir, exist_ok=True)
-    file_path = upload_dir / file.filename
-    try:
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        print("File saved successfully.")
-    except Exception as e:
-        print("Error saving file:", e)
-        raise HTTPException(status_code=500, detail=f"Error saving file: {e}")
-
-    raw_data_path = processed_dir / f"raw_data_{file.filename}"
-    covariates_path = processed_dir / f"covariates_{file.filename}"
-    
-    try:
-        raw_data_script = "../Csv-Creator/script.py"
-        subprocess.run([
-            "python", raw_data_script,
-            "--input", str(file_path),
-            "--output", str(raw_data_path),
-            "--default-start-date", "2000-01-01",
-            "--default-end-date", "2000-12-31",
-            "--all-variables",
-            "--cache-file", f"{processed_dir}/cache.json"
-        ], check=True)
-        
-        if option == "full":
-            covariates_script = "../Csv-Creator/covariablesv3.py"
-            subprocess.run([
-                "python", covariates_script,
-                "--input", str(raw_data_path),
-                "--output", str(covariates_path)
-            ], check=True)
-        
-        # Poll until the raw data file exists (timeout after, say, 60 seconds)
-        if not wait_for_file(raw_data_path):
-            raise HTTPException(status_code=500, detail="Raw data file was not created in time.")
-        if option == "full" and not wait_for_file(covariates_path):
-            raise HTTPException(status_code=500, detail="Covariates file was not created in time.")
-
-        if option == "full":
-            return {
-                "message": "Processing complete.",
-                "jobId": job_id,
-                "rawDataFile": f"/download/{job_id}/raw_data_{file.filename}",
-                "covariatesFile": f"/download/{job_id}/covariates_{file.filename}"
-            }
-        else:
-            return {
-                "message": "Processing complete.",
-                "jobId": job_id,
-                "rawDataFile": f"/download/{job_id}/raw_data_{file.filename}"
-            }
-    except subprocess.CalledProcessError as e:
-        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
-
-
-@app.get("/download/{job_id}/{filename}")
-async def download_file(job_id: str, filename: str):
-    file_path = Path(f"../Csv-Creator/processed/{job_id}/{filename}")
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(path=file_path, filename=filename, media_type="application/octet-stream")
-
-
-@app.get("/climate-data-bbox/")
-async def get_climate_data_bbox(
-    min_lon: float = Query(..., description="Minimum longitude coordinate"),
-    min_lat: float = Query(..., description="Minimum latitude coordinate"),
-    max_lon: float = Query(..., description="Maximum longitude coordinate"),
-    max_lat: float = Query(..., description="Maximum latitude coordinate"),
-    date: str = Query(..., description="Date in YYYY-MM-DD format"),
-    data_source: DataSource = Query(DataSource.WORLDCLIM, description="Data source"),
-    variable: Optional[Variable] = Query(None, description="Climate variable"),
-    max_points: int = Query(100, description="Maximum number of points to return"),
-    db: AsyncSession = Depends(get_db)
-):
-    # Validate inputs
-    if not (-90 <= min_lat <= 90) or not (-90 <= max_lat <= 90):
-        raise HTTPException(status_code=400, detail="Latitude must be between -90 and 90")
-    if not (-180 <= min_lon <= 180) or not (-180 <= max_lon <= 180):
-        raise HTTPException(status_code=400, detail="Longitude must be between -180 and 180")
-    if min_lat > max_lat:
-        raise HTTPException(status_code=400, detail="min_lat must be less than or equal to max_lat")
-    if min_lon > max_lon:
-        raise HTTPException(status_code=400, detail="min_lon must be less than or equal to max_lon")
-    
-    # Set default variable based on data source if not provided
-    if variable is None:
-        if data_source == DataSource.WORLDCLIM:
-            variable = Variable.PRECIPITATION
-        elif data_source == DataSource.SPEI:
-            variable = Variable.SPEI
-        elif data_source == DataSource.CHIRPS:
-            variable = Variable.CHIRPS
-        elif data_source == DataSource.ET:
-            variable = Variable.ET
-        elif data_source == DataSource.ELEVATION:
-            variable = Variable.ELEVATION
-        elif data_source == DataSource.SOILGRIDS:
-            variable = Variable.BDOD
-        elif data_source == DataSource.TERRACLIM:
-            variable = Variable.PPT
-        elif data_source == DataSource.NASAPOWER:
-            variable = Variable.ALLSKY_SFC_SW_DWN
-            
-    # Create random points within the bounding box (up to max_points)
-    import random
-    random_points = []
-    for _ in range(max_points):
-        lat = min_lat + random.random() * (max_lat - min_lat)
-        lon = min_lon + random.random() * (max_lon - min_lon)
-        random_points.append({"lat": round(lat, 6), "lon": round(lon, 6)})
-    
-    # For time series data sources like WorldClim, SPEI, etc.
-    try:
-        date_obj = datetime.strptime(date, "%Y-%m-%d")
-        year = date_obj.year
-        month = date_obj.month
-        day = date_obj.day
-        
-        # Get table name based on data source and date
+   
+    # Convert string dates to datetime objects if they are provided
+    start_date_obj = None
+    end_date_obj = None
+    if start_date:
         try:
-            if data_source in [DataSource.WORLDCLIM, DataSource.SPEI, DataSource.TERRACLIM, DataSource.NASAPOWER]:
-                # For monthly data
-                table_name = get_table_name(data_source, variable, year, month)
-            elif data_source == DataSource.CHIRPS:
-                # For daily data
-                table_name = get_table_name(data_source, variable, year, month, day)
-            elif data_source == DataSource.ET:
-                # For 8-day data
-                table_name = get_table_name(data_source, variable, year, month, day)
-            elif data_source in [DataSource.ELEVATION, DataSource.SOILGRIDS]:
-                # For static data
-                table_name = get_table_name(data_source, variable)
-            else:
-                raise HTTPException(status_code=400, detail=f"Unsupported data source: {data_source}")
-                
-            # Check if table exists
-            check_query = text(f"""
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_name = '{table_name}'
-                );
-            """)
-            
-            result = await db.execute(check_query)
-            exists = result.scalar()
-            
-            if not exists:
-                return {
-                    "message": f"No data available for {data_source.value} {variable.value} at {date}",
-                    "bbox": {
-                        "min_lon": min_lon,
-                        "min_lat": min_lat,
-                        "max_lon": max_lon,
-                        "max_lat": max_lat
-                    },
-                    "data_source": data_source.value,
-                    "variable": variable.value,
-                    "date": date,
-                    "points": []
-                }
-            
-            # Query values at each random point
-            points_with_values = []
-            
-            for point in random_points:
-                lat = point["lat"]
-                lon = point["lon"]
-                point_wkt = f"POINT({lon} {lat})"
-                
+            start_date_obj = datetime.strptime(start_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid start_date format. Use YYYY-MM-DD")
+    
+    if end_date:
+        try:
+            end_date_obj = datetime.strptime(end_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid end_date format. Use YYYY-MM-DD")
+
+    # For all other data sources
+    point_wkt = f"ST_SetSRID(ST_MakePoint({lon}, {lat}), 4326)"
+    table_name = DATA_SOURCE_TABLES.get(data_source)
+    
+    if not table_name:
+        raise HTTPException(status_code=400, detail=f"Unknown data source: {data_source}")
+    
+    if not await table_exists(db, table_name):
+        raise HTTPException(status_code=404, detail=f"No data available for {data_source.value}")
+    
+    try:
+        # --- STATIC DATA SOURCES: Elevation, SoilGrids ---
+        if data_source in STATIC_DATA_SOURCES:
+            if data_source == DataSource.SOILGRIDS:
+                variables = AVAILABLE_VARIABLES.get(data_source, [])
                 query = text(f"""
                     SELECT 
-                        ST_Value(rast, ST_SetSRID(ST_GeomFromText('{point_wkt}'), 4326)) AS value
-                    FROM {table_name} 
-                    WHERE ST_Intersects(rast, ST_SetSRID(ST_GeomFromText('{point_wkt}'), 4326))
-                    LIMIT 1
+                        {", ".join([f"MAX(CASE WHEN var_name = '{var}' THEN point_value END) AS {var}" for var in variables])}
+                    FROM (
+                        SELECT 
+                            var_name,
+                            ST_Value(rast, {point_wkt}) AS point_value
+                        FROM 
+                            {table_name}
+                        WHERE 
+                            ST_Intersects(rast, {point_wkt})
+                            AND var_name IN ({", ".join([f"'{var}'" for var in variables])})
+                    ) subquery
                 """)
-                
                 result = await db.execute(query)
                 row = result.mappings().first()
+                return {
+                    "data_source": data_source.value,
+                    "location": {"lat": lat, "lon": lon},
+                    "values": {k: v for k, v in row.items() if v is not None} if row else {}
+                }
                 
-                if row and row['value'] is not None:
-                    points_with_values.append({
-                        "lat": lat,
-                        "lon": lon,
-                        "value": row['value']
-                    })
+        # --- SOURCES WITH VAR_NAME COLUMN ---
+        elif data_source in DATASOURCES_WITH_VARIABLES:
+            variables = AVAILABLE_VARIABLES.get(data_source, [])
+            var_list = ", ".join([f"'{var}'" for var in variables])
+            query = text(f"""
+                SELECT 
+                    date_id,
+                    {", ".join([f"MAX(CASE WHEN var_name = '{var}' THEN point_value END) AS {var}" for var in variables])}
+                FROM (
+                    SELECT 
+                        date_id,
+                        var_name,
+                        ST_Value(rast, {point_wkt}) AS point_value
+                    FROM 
+                        {table_name}
+                    WHERE 
+                        date_id BETWEEN :start_date AND :end_date
+                        AND ST_Intersects(rast, {point_wkt})
+                        AND var_name IN ({var_list})
+                ) subquery
+                GROUP BY date_id
+                ORDER BY date_id
+            """)
+            result = await db.execute(query, {"start_date": start_date_obj, "end_date": end_date_obj})
+            rows = result.mappings().all()
             
-            # Return the results
-            return {
-                "bbox": {
-                    "min_lon": min_lon,
-                    "min_lat": min_lat,
-                    "max_lon": max_lon,
-                    "max_lat": max_lat
-                },
-                "data_source": data_source.value,
-                "variable": variable.value,
-                "date": date,
-                "points": points_with_values
-            }
+        # --- SOURCES WITHOUT VAR_NAME COLUMN ---
+        else:
+            output_column = "prec"
+            if data_source == DataSource.SPEI:
+                output_column = "spei"
+            elif data_source == DataSource.ET:
+                output_column = "et"
             
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
+            query = text(f"""
+                SELECT 
+                    date_id,
+                    ST_Value(rast, {point_wkt}) AS {output_column}
+                FROM 
+                    {table_name}
+                WHERE 
+                    date_id BETWEEN :start_date AND :end_date
+                    AND ST_Intersects(rast, {point_wkt})
+                ORDER BY date_id
+            """)
+            result = await db.execute(query, {"start_date": start_date_obj, "end_date": end_date_obj})
+            rows = result.mappings().all()
+            print(rows)
+        
+        # --- Format time series results ---
+        formatted_data = []
+        for row in rows:
             
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+            if row:
+                date_obj = row["date_id"]
+                formatted_row = {
+                    "date": date_obj.strftime("%Y-%m-%d"),
+                    "year": date_obj.year,
+                    "month": date_obj.month
+                }
+                if data_source == DataSource.CHIRPS:
+                    formatted_row["day"] = date_obj.day
+                formatted_row["values"] = {k: v for k, v in row.items() if k != "date_id" and v is not None}
+                formatted_data.append(formatted_row)
+                
+        return {
+            "data_source": data_source.value,
+            "location": {"lat": lat, "lon": lon},
+            "start_date": start_date,
+            "end_date": end_date,
+            "cadence": DATA_SOURCE_CADENCE.get(data_source, Cadence.MONTHLY).value,
+            "data": formatted_data
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
 
-@app.get("/climate-data-bbox-timeseries/")
-async def get_climate_data_bbox_timeseries(
-    min_lon: float = Query(..., description="Minimum longitude coordinate"),
-    min_lat: float = Query(..., description="Minimum latitude coordinate"),
-    max_lon: float = Query(..., description="Maximum longitude coordinate"),
-    max_lat: float = Query(..., description="Maximum latitude coordinate"),
-    start_date: str = Query(..., description="Start date in YYYY-MM-DD format"),
-    end_date: str = Query(..., description="End date in YYYY-MM-DD format"),
+    
+    
+
+def sanitize_for_json(obj):
+    """Recursively sanitize an object for JSON serialization, replacing NaN and Infinity with None."""
+    if isinstance(obj, dict):
+        return {k: sanitize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_for_json(i) for i in obj]
+    elif isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+        return None
+    else:
+        return obj
+
+  
+@app.get("/climate-data-timeseries-bbox-sampled/")
+async def get_climate_data_timeseries_bbox_sampled(
+    min_lat: float = Query(..., description="Minimum latitude of BBOX"),
+    min_lon: float = Query(..., description="Minimum longitude of BBOX"),
+    max_lat: float = Query(..., description="Maximum latitude of BBOX"),
+    max_lon: float = Query(..., description="Maximum longitude of BBOX"),
+    date: Optional[str] = Query(None, description="Single date in YYYY-MM-DD format"),
+    start_date: Optional[str] = Query(None, description="Start date in YYYY-MM-DD format (for time series)"),
+    end_date: Optional[str] = Query(None, description="End date in YYYY-MM-DD format (for time series)"),
     data_source: DataSource = Query(DataSource.WORLDCLIM, description="Data source"),
-    variable: Optional[Variable] = Query(None, description="Climate variable"),
-    max_points: int = Query(5, description="Maximum number of random points to sample"),
+    variable: Optional[str] = Query(None, description="Specific variable to query"),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Get time series climate data for multiple random points within a bounding box.
-    Returns up to max_points random sample points with climate time series data.
+    Get climate data for a bounding box (BBOX) with random sampling.
+    - For single date mode: Uses 'date' parameter and samples 100 random points
+    - For time series mode: Uses 'start_date'/'end_date' parameters and samples 5 random points
     """
-    # Validate inputs
-    if not (-90 <= min_lat <= 90) or not (-90 <= max_lat <= 90):
-        raise HTTPException(status_code=400, detail="Latitude must be between -90 and 90")
-    if not (-180 <= min_lon <= 180) or not (-180 <= max_lon <= 180):
-        raise HTTPException(status_code=400, detail="Longitude must be between -180 and 180")
-    if min_lat > max_lat:
-        raise HTTPException(status_code=400, detail="min_lat must be less than or equal to max_lat")
-    if min_lon > max_lon:
-        raise HTTPException(status_code=400, detail="min_lon must be less than or equal to max_lon")
+    # Determine if we're in time series mode
+    is_time_series = start_date is not None and end_date is not None
     
-    # Set default variable based on data source if not provided
-    if variable is None:
-        if data_source == DataSource.WORLDCLIM:
-            variable = Variable.PRECIPITATION
-        elif data_source == DataSource.SPEI:
-            variable = Variable.SPEI
-        elif data_source == DataSource.CHIRPS:
-            variable = Variable.CHIRPS
-        elif data_source == DataSource.ET:
-            variable = Variable.ET
-        elif data_source == DataSource.TERRACLIM:
-            variable = Variable.PPT
-        elif data_source == DataSource.NASAPOWER:
-            variable = Variable.ALLSKY_SFC_SW_DWN
+    # Set appropriate sample size based on mode
+    sample_size = 5 
     
-    # Check if data source is static
-    if data_source in [DataSource.ELEVATION, DataSource.SOILGRIDS]:
-        raise HTTPException(status_code=400, detail="Time series not available for static data sources")
+    # Validate inputs based on mode
+    if is_time_series:
+        if not start_date or not end_date:
+            raise HTTPException(status_code=400, detail="Both start_date and end_date are required for time series mode")
     
-    # Parse dates
+    # Convert dates
     try:
-        start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
-        end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
+        date_obj = datetime.strptime(date, "%Y-%m-%d").date() if date else None
+        start_date_obj = datetime.strptime(start_date, "%Y-%m-%d").date() if start_date else None
+        end_date_obj = datetime.strptime(end_date, "%Y-%m-%d").date() if end_date else None
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
     
-    if end_date_obj < start_date_obj:
-        raise HTTPException(status_code=400, detail="End date must be greater than or equal to start date.")
+    # Validate data source
+    table_name = DATA_SOURCE_TABLES.get(data_source)
+    if not table_name:
+        raise HTTPException(status_code=400, detail=f"Unknown data source: {data_source}")
     
-    # Create random points within the bounding box
-    import random
-    random_points = []
-    for _ in range(max_points):
-        lat = min_lat + random.random() * (max_lat - min_lat)
-        lon = min_lon + random.random() * (max_lon - min_lon)
-        random_points.append({"lat": round(lat, 6), "lon": round(lon, 6)})
+    if not await table_exists(db, table_name):
+        raise HTTPException(status_code=404, detail=f"No data available for {data_source.value}")
     
-    # Get cadence for the data source
-    cadence = get_cadence_for_data_source(data_source)
+    # Get default variable if not provided
+    if not variable:
+        available_vars = AVAILABLE_VARIABLES.get(data_source, [])
+        if available_vars:
+            variable = available_vars[0]
+        else:
+            raise HTTPException(status_code=400, detail=f"No variables available for {data_source.value}")
+    elif variable not in AVAILABLE_VARIABLES.get(data_source, []):
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Variable '{variable}' not available for {data_source.value}. Available variables: {', '.join(AVAILABLE_VARIABLES.get(data_source, []))}"
+        )
     
-    # Initialize result structure
-    result = {
-        "bbox": {
-            "min_lon": min_lon,
-            "min_lat": min_lat,
-            "max_lon": max_lon,
-            "max_lat": max_lat
-        },
-        "data_source": data_source.value,
-        "variable": variable.value,
-        "cadence": cadence.value,
-        "start_date": start_date,
-        "end_date": end_date,
-        "points": []
-    }
-    
-    # Process points based on cadence
-    for point in random_points:
-        lat = point["lat"]
-        lon = point["lon"]
-        point_wkt = f"POINT({lon} {lat})"
-        point_values = []
+    try:
+        # Generate random sample points within the bounding box using Python instead of SQL
+        # This avoids the transaction rollback issues
+        import random
+        import math  # Import math for NaN checks
+        random_points = []
+        for _ in range(sample_size):  # Fixed syntax error
+            lat = min_lat + random.random() * (max_lat - min_lat)
+            lon = min_lon + random.random() * (max_lon - min_lon)
+            random_points.append({"lat": lat, "lon": lon})
         
-        # Function to check if a table exists
-        async def table_exists(table_name):
-            check_query = text(f"""
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_name = '{table_name}'
-                );
-            """)
-            
-            try:
-                result = await db.execute(check_query)
-                return result.scalar()
-            except Exception:
-                return False
-        
-        if cadence == Cadence.MONTHLY:
-            # For WorldClim, SPEI, TerraClim, NASA POWER (monthly cadence)
-            current_date = datetime(start_date_obj.year, start_date_obj.month, 1)
-            end_month = datetime(end_date_obj.year, end_date_obj.month, 1)
-            
-            while current_date <= end_month:
-                year = current_date.year
-                month = current_date.month
-                date_key = f"{year}-{month:02d}"
-                
-                try:
-                    table_name = get_table_name(data_source, variable, year, month)
-                    
-                    # Check if table exists before querying
-                    if await table_exists(table_name):
-                        query = text(f"""
-                            SELECT ST_Value(rast, ST_SetSRID(ST_GeomFromText('{point_wkt}'), 4326)) AS value 
-                            FROM {table_name} 
-                            WHERE ST_Intersects(rast, ST_SetSRID(ST_GeomFromText('{point_wkt}'), 4326))
-                            LIMIT 1
-                        """)
-                        
-                        try:
-                            query_result = await db.execute(query)
-                            row = query_result.mappings().first()
-                            value = row['value'] if row and 'value' in row else None
-                            
-                            if value is not None:
-                                point_values.append({
-                                    "date": date_key,
-                                    "year": year,
-                                    "month": month,
-                                    "value": value
-                                })
-                        except Exception:
-                            # Skip if error
-                            pass
-                    
-                except Exception:
-                    # Skip if error
-                    pass
-                
-                # Move to next month
-                if current_date.month == 12:
-                    current_date = datetime(current_date.year + 1, 1, 1)
-                else:
-                    current_date = datetime(current_date.year, current_date.month + 1, 1)
-        
-        elif cadence == Cadence.DAILY:
-            # For CHIRPS (daily cadence)
-            current_date = start_date_obj
-            
-            while current_date <= end_date_obj:
-                year = current_date.year
-                month = current_date.month
-                day = current_date.day
-                date_key = f"{year}-{month:02d}-{day:02d}"
-                
-                try:
-                    table_name = get_table_name(data_source, variable, year, month, day)
-                    
-                    # Check if table exists before querying
-                    if await table_exists(table_name):
-                        query = text(f"""
-                            SELECT ST_Value(rast, ST_SetSRID(ST_GeomFromText('{point_wkt}'), 4326)) AS value 
-                            FROM {table_name} 
-                            WHERE ST_Intersects(rast, ST_SetSRID(ST_GeomFromText('{point_wkt}'), 4326))
-                            LIMIT 1
-                        """)
-                        
-                        try:
-                            query_result = await db.execute(query)
-                            row = query_result.mappings().first()
-                            value = row['value'] if row and 'value' in row else None
-                            
-                            if value is not None:
-                                point_values.append({
-                                    "date": date_key,
-                                    "year": year,
-                                    "month": month,
-                                    "day": day,
-                                    "value": value
-                                })
-                        except Exception:
-                            # Skip if error
-                            pass
-                except Exception:
-                    # Skip if error
-                    pass
-                
-                # Move to next day
-                current_date += timedelta(days=1)
-        
-        elif cadence == Cadence.EIGHT_DAY:
-            # For ET (8-day cadence)
-            # Get a list of all ET tables in the database that fall within the date range
-            tables_query = text(f"""
-                SELECT table_name 
-                FROM information_schema.tables 
-                WHERE table_name LIKE 'et\_%' 
-                AND table_schema = 'public'
-                ORDER BY table_name
-            """)
-            
-            try:
-                tables_result = await db.execute(tables_query)
-                et_tables = [row['table_name'] for row in tables_result.mappings().all()]
-                
-                # Filter tables to only include those in the requested date range
-                filtered_tables = []
-                for table in et_tables:
-                    # Parse the date from table name (et_YYYY_MM_DD format)
-                    try:
-                        parts = table.split('_')
-                        if len(parts) == 4:
-                            year = int(parts[1])
-                            month = int(parts[2])
-                            day = int(parts[3])
-                            
-                            table_date = datetime(year, month, day)
-                            if start_date_obj <= table_date <= end_date_obj:
-                                filtered_tables.append({
-                                    "table": table,
-                                    "date": table_date,
-                                    "year": year,
-                                    "month": month,
-                                    "day": day
-                                })
-                    except (ValueError, IndexError):
-                        # Skip tables that don't match our expected format
-                        continue
-                
-                # Sort the filtered tables by date
-                filtered_tables.sort(key=lambda x: x["date"])
-                
-                # Now query each table in the filtered list
-                for table_info in filtered_tables:
-                    table_name = table_info["table"]
-                    year = table_info["year"]
-                    month = table_info["month"]
-                    day = table_info["day"]
-                    date_key = f"{year}-{month:02d}-{day:02d}"
-                    
-                    # Define the query for this table
-                    query = text(f"""
-                        SELECT ST_Value(rast, ST_SetSRID(ST_GeomFromText('{point_wkt}'), 4326)) AS value 
-                        FROM {table_name} 
-                        WHERE ST_Intersects(rast, ST_SetSRID(ST_GeomFromText('{point_wkt}'), 4326))
-                        LIMIT 1
-                    """)
-                    
-                    try:
-                        query_result = await db.execute(query)
-                        row = query_result.mappings().first()
-                        value = row['value'] if row and 'value' in row else None
-                        
-                        if value is not None:
-                            point_values.append({
-                                "date": date_key,
-                                "year": year,
-                                "month": month,
-                                "day": day,
-                                "value": value
-                            })
-                    except Exception:
-                        # Skip if error
-                        pass
-            except Exception:
-                # Handle any errors in the table lookup process
-                pass
-        
-        # Add this point to the result if it has values
-        if point_values:
-            result["points"].append({
-                "lat": lat,
-                "lon": lon,
-                "values": point_values
-            })
-    
-    # Only return points that have data
-    if not result["points"]:
-        return {
-            "message": f"No time series data found within the bounding box for {data_source.value}-{variable.value}",
-            "bbox": result["bbox"],
-            "data_source": result["data_source"],
-            "variable": result["variable"],
-            "cadence": result["cadence"],
+        # Initialize result structure
+        result = {
+            "bbox": [min_lat, min_lon, max_lat, max_lon],
+            "data_source": data_source.value,
+            "variable": variable,
+            "sample_size": len(random_points),
             "points": []
         }
+        
+        # Add date information based on mode
+        if is_time_series:
+            result["start_date"] = start_date
+            result["end_date"] = end_date
+            result["cadence"] = DATA_SOURCE_CADENCE.get(data_source, Cadence.MONTHLY).value
+        else:
+            result["date"] = date
+        
+        # Process each sample point
+        for point in random_points:
+            lat = point["lat"]
+            lon = point["lon"]
+            point_wkt = f"ST_SetSRID(ST_MakePoint({lon}, {lat}), 4326)"
+            
+            point_data = {
+                "lat": lat,
+                "lon": lon,
+                "values": {}
+            }
+            
+            # Query based on time series or single date mode
+            if is_time_series:
+                # Time series mode - process multiple dates
+                if data_source in DATASOURCES_WITH_VARIABLES:
+                    query = text(f"""
+                        SELECT 
+                            date_id,
+                            var_name,
+                            ST_Value(rast, {point_wkt}) AS point_value
+                        FROM 
+                            {table_name}
+                        WHERE 
+                            date_id BETWEEN :start_date AND :end_date
+                            AND var_name = :variable
+                            AND ST_Value(rast, {point_wkt}) IS NOT NULL
+                        ORDER BY date_id
+                    """)
+                    
+                    result_data = await db.execute(query, {
+                        "start_date": start_date_obj,
+                        "end_date": end_date_obj,
+                        "variable": variable
+                    })
+                else:
+                    # For data sources without var_name column
+                    query = text(f"""
+                        SELECT 
+                            date_id,
+                            ST_Value(rast, {point_wkt}) AS point_value
+                        FROM 
+                            {table_name}
+                        WHERE 
+                            date_id BETWEEN :start_date AND :end_date
+                            AND ST_Value(rast, {point_wkt}) IS NOT NULL
+                        ORDER BY date_id
+                    """)
+                    
+                    result_data = await db.execute(query, {
+                        "start_date": start_date_obj,
+                        "end_date": end_date_obj
+                    })
+                
+                # Process time series results
+                rows = result_data.mappings().all()
+                time_values = []
+                
+                for row in rows:
+                    if row["point_value"] is not None:
+                        date_obj = row["date_id"]
+                        
+                        # Handle NaN values - Convert to None for JSON serialization
+                        point_value = row["point_value"]
+                        if isinstance(point_value, float) and (math.isnan(point_value) or math.isinf(point_value)):
+                            point_value = None
+                            
+                        time_value = {
+                            "date": date_obj.strftime("%Y-%m-%d"),
+                            "year": date_obj.year,
+                            "month": date_obj.month,
+                            "values": {variable: point_value}  # Use the sanitized value
+                        }
+                        
+                        # Add day for daily cadence
+                        if DATA_SOURCE_CADENCE.get(data_source) == Cadence.DAILY:
+                            time_value["day"] = date_obj.day
+                            
+                        time_values.append(time_value)
+                
+                # Only add point if it has data
+                if time_values:
+                    point_data["values"] = time_values
+                    result["points"].append(point_data)
+                
+            else:
+                # Single date mode or static data
+                if data_source in STATIC_DATA_SOURCES:
+                    # For static data sources (elevation, soilgrids)
+                    if data_source == DataSource.SOILGRIDS:
+                        variables = AVAILABLE_VARIABLES.get(data_source, [])
+                        query = text(f"""
+                            SELECT 
+                                var_name,
+                                ST_Value(rast, {point_wkt}) AS point_value
+                            FROM 
+                                {table_name}
+                            WHERE 
+                                var_name IN ({", ".join([f"'{var}'" for var in variables])})
+                                AND ST_Value(rast, {point_wkt}) IS NOT NULL
+                        """)
+                        
+                        result_data = await db.execute(query)
+                        rows = result_data.mappings().all()
+                        
+                        for row in rows:
+                            if row["point_value"] is not None:
+                                # Handle NaN values
+                                point_value = row["point_value"]
+                                if isinstance(point_value, float) and (math.isnan(point_value) or math.isinf(point_value)):
+                                    point_value = None
+                                    
+                                if point_value is not None:
+                                    point_data["values"][row["var_name"]] = point_value
+                    else:
+                        # For elevation
+                        query = text(f"""
+                            SELECT 
+                                ST_Value(rast, {point_wkt}) AS point_value
+                            FROM 
+                                {table_name}
+                            WHERE 
+                                ST_Value(rast, {point_wkt}) IS NOT NULL
+                            LIMIT 1
+                        """)
+                        
+                        result_data = await db.execute(query)
+                        row = result_data.mappings().first()
+                        
+                        if row and row["point_value"] is not None:
+                            # Handle NaN values
+                            point_value = row["point_value"]
+                            if isinstance(point_value, float) and (math.isnan(point_value) or math.isinf(point_value)):
+                                point_value = None
+                                
+                            if point_value is not None:
+                                point_data["values"][variable] = point_value
+               
+                # Only add point if it has data
+                if point_data["values"]:
+                    result["points"].append(point_data)
+        
+        
+        # Calculate statistics if we have points
+        if result["points"]:
+            # For single date mode, calculate overall statistics
+            if not is_time_series:
+                values = [p["values"].get(variable) for p in result["points"] if variable in p["values"]]
+                if values:
+                    # Filter out any remaining NaN values before statistics
+                    values = [v for v in values if not (isinstance(v, float) and (math.isnan(v) or math.isinf(v)))]
+                    if values:  # Make sure we still have values after filtering
+                        result["stats"] = {
+                            "min": min(values),
+                            "max": max(values),
+                            "avg": sum(values) / len(values),
+                            "count": len(values)
+                        }
+        result = sanitize_for_json(result)
+        return result
     
-    return result
-
+    except Exception as e:
+        import traceback
+        error_traceback = traceback.format_exc()
+        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}\n{error_traceback}")
+            
 # Mount the static files directory
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -747,3 +576,347 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 async def get_ui():
     with open("static/timeseriesv3.html", "r") as f:
         return f.read()
+
+@app.get("/climate-data-grid-samples/")
+async def get_climate_data_grid_samples(
+    min_lat: float = Query(..., description="Minimum latitude of BBOX"),
+    min_lon: float = Query(..., description="Minimum longitude of BBOX"),
+    max_lat: float = Query(..., description="Maximum latitude of BBOX"),
+    max_lon: float = Query(..., description="Maximum longitude of BBOX"),
+    start_date: Optional[str] = Query(None, description="Start date in YYYY-MM-DD format"),
+    end_date: Optional[str] = Query(None, description="End date in YYYY-MM-DD format"),
+    data_source: DataSource = Query(DataSource.CHIRPS, description="Data source"),
+    variable: Optional[str] = Query(None, description="Specific variable to query"),
+    grid_size: int = Query(5, description="Number of points in each direction (total points = grid_size^2)"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get climate data for a bounding box (BBOX) using a regular grid of points.
+    Returns time series data for each point in the grid.
+    """
+    # Validate dates
+    if not start_date or not end_date:
+        raise HTTPException(status_code=400, detail="Both start_date and end_date are required")
+    
+    try:
+        start_date_obj = datetime.strptime(start_date, "%Y-%m-%d").date()
+        end_date_obj = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    
+    # Validate data source
+    table_name = DATA_SOURCE_TABLES.get(data_source)
+    if not table_name:
+        raise HTTPException(status_code=400, detail=f"Unknown data source: {data_source}")
+    
+    if not await table_exists(db, table_name):
+        raise HTTPException(status_code=404, detail=f"No data available for {data_source.value}")
+    
+    # Special handling for CHIRPS - use the correct variable
+    if data_source == DataSource.CHIRPS:
+        # CHIRPS uses 'chirps' as variable name in the config but we'll use 'prec' for output consistency
+        output_variable = "prec"
+    else:
+        # Get default variable if not provided
+        if not variable:
+            available_vars = AVAILABLE_VARIABLES.get(data_source, [])
+            if available_vars:
+                output_variable = available_vars[0]
+            else:
+                raise HTTPException(status_code=400, detail=f"No variables available for {data_source.value}")
+        elif variable not in AVAILABLE_VARIABLES.get(data_source, []):
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Variable '{variable}' not available for {data_source.value}. Available variables: {', '.join(AVAILABLE_VARIABLES.get(data_source, []))}"
+            )
+        else:
+            output_variable = variable
+    
+    try:
+        # Generate grid points
+        grid_points = []
+        lat_step = (max_lat - min_lat) / (grid_size - 1) if grid_size > 1 else 0
+        lon_step = (max_lon - min_lon) / (grid_size - 1) if grid_size > 1 else 0
+        
+        for i in range(grid_size):
+            for j in range(grid_size):
+                lat = min_lat + i * lat_step
+                lon = min_lon + j * lon_step
+                grid_points.append({"lat": lat, "lon": lon})
+        
+        # Initialize result structure
+        result = {
+            "bbox": [min_lat, min_lon, max_lat, max_lon],
+            "data_source": data_source.value,
+            "variable": output_variable,
+            "grid_size": grid_size,
+            "total_points": len(grid_points),
+            "start_date": start_date,
+            "end_date": end_date,
+            "cadence": DATA_SOURCE_CADENCE.get(data_source, Cadence.MONTHLY).value,
+            "points": []
+        }
+        
+        # Process each grid point
+        for point in grid_points:
+            lat = point["lat"]
+            lon = point["lon"]
+            point_wkt = f"ST_SetSRID(ST_MakePoint({lon}, {lat}), 4326)"
+            
+            point_data = {
+                "lat": lat,
+                "lon": lon,
+                "values": []
+            }
+            
+            # Query database based on data source type
+            if data_source in DATASOURCES_WITH_VARIABLES:
+                # For sources with var_name column
+                query = text(f"""
+                    SELECT 
+                        date_id,
+                        var_name,
+                        ST_Value(rast, {point_wkt}) AS point_value
+                    FROM 
+                        {table_name}
+                    WHERE 
+                        date_id BETWEEN :start_date AND :end_date
+                        AND var_name = :variable
+                        AND ST_Intersects(rast, {point_wkt})
+                    ORDER BY date_id
+                """)
+                
+                result_data = await db.execute(query, {
+                    "start_date": start_date_obj,
+                    "end_date": end_date_obj,
+                    "variable": variable
+                })
+            else:
+                # For sources without var_name column (like CHIRPS)
+                query = text(f"""
+                    SELECT 
+                        date_id,
+                        ST_Value(rast, {point_wkt}) AS point_value
+                    FROM 
+                        {table_name}
+                    WHERE 
+                        date_id BETWEEN :start_date AND :end_date
+                        AND ST_Intersects(rast, {point_wkt})
+                    ORDER BY date_id
+                """)
+                
+                result_data = await db.execute(query, {
+                    "start_date": start_date_obj,
+                    "end_date": end_date_obj
+                })
+            
+            # Process results
+            rows = result_data.mappings().all()
+            time_values = []
+            
+            for row in rows:
+                # Skip null values
+                if row["point_value"] is None:
+                    continue
+                    
+                date_obj = row["date_id"]
+                
+                # Handle NaN values
+                point_value = row["point_value"]
+                if isinstance(point_value, float) and (math.isnan(point_value) or math.isinf(point_value)):
+                    continue
+                
+                time_value = {
+                    "date": date_obj.strftime("%Y-%m-%d"),
+                    "year": date_obj.year,
+                    "month": date_obj.month,
+                    "values": {output_variable: point_value}
+                }
+                
+                # Add day for daily cadence
+                if DATA_SOURCE_CADENCE.get(data_source) == Cadence.DAILY:
+                    time_value["day"] = date_obj.day
+                
+                time_values.append(time_value)
+            
+            # Only add point if it has data
+            if time_values:
+                point_data["values"] = time_values
+                result["points"].append(point_data)
+        
+        # Calculate average time series across all points
+        date_values = {}
+        for point in result["points"]:
+            for time_value in point["values"]:
+                date = time_value["date"]
+                if date not in date_values:
+                    date_values[date] = {"sum": 0, "count": 0}
+                
+                if output_variable in time_value["values"] and time_value["values"][output_variable] is not None:
+                    date_values[date]["sum"] += time_value["values"][output_variable]
+                    date_values[date]["count"] += 1
+        
+        # Create average time series
+        average_series = []
+        for date, data in sorted(date_values.items()):
+            if data["count"] > 0:
+                date_obj = datetime.strptime(date, "%Y-%m-%d")
+                avg_value = data["sum"] / data["count"]
+                
+                average_point = {
+                    "date": date,
+                    "year": date_obj.year,
+                    "month": date_obj.month,
+                    "values": {output_variable: avg_value}
+                }
+                
+                # Add day for daily cadence
+                if DATA_SOURCE_CADENCE.get(data_source) == Cadence.DAILY:
+                    average_point["day"] = date_obj.day
+                
+                average_series.append(average_point)
+        
+        # Add average series to result
+        result["average_series"] = average_series
+        
+        # Calculate monthly averages
+        monthly_averages = {}
+        for point in average_series:
+            month_key = f"{point['year']}-{point['month']:02d}"
+            if month_key not in monthly_averages:
+                monthly_averages[month_key] = {"sum": 0, "count": 0}
+            
+            if output_variable in point["values"] and point["values"][output_variable] is not None:
+                monthly_averages[month_key]["sum"] += point["values"][output_variable]
+                monthly_averages[month_key]["count"] += 1
+        
+        # Create monthly average series
+        monthly_series = []
+        for month_key, data in sorted(monthly_averages.items()):
+            if data["count"] > 0:
+                year, month = map(int, month_key.split('-'))
+                avg_value = data["sum"] / data["count"]
+                
+                monthly_series.append({
+                    "year": year,
+                    "month": month,
+                    "value": avg_value
+                })
+        
+        # Add monthly series to result
+        result["monthly_averages"] = monthly_series
+        
+        # If we have no points, return a meaningful message
+        if len(result["points"]) == 0:
+            return {"message": "No data found for the specified parameters", "bbox": result["bbox"], "data_source": result["data_source"]}
+        
+        return sanitize_for_json(result)
+    
+    except Exception as e:
+        import traceback
+        error_traceback = traceback.format_exc()
+        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}\n{error_traceback}")
+    
+    
+@app.get("/climate-data-grid-heatmap/")
+async def get_climate_data_grid_heatmap(
+    min_lat: float = Query(...),
+    min_lon: float = Query(...),
+    max_lat: float = Query(...),
+    max_lon: float = Query(...),
+    start_date: str = Query(...),
+    end_date: str = Query(...),
+    data_source: DataSource = Query(DataSource.CHIRPS),
+    variable: str = Query("prec"),
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        start_date_obj = datetime.strptime(start_date, "%Y-%m-%d").date()
+        end_date_obj = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format")
+
+    year = start_date_obj.year
+    table_name = f"{data_source.value}_data_{year}"  # Assume partitions are named like chirps_data_2023
+
+    query = text(f"""
+        SELECT
+            date,
+            ST_Y(ST_Centroid(ST_Transform(grid.geom, 4326))) AS lat,
+            ST_X(ST_Centroid(ST_Transform(grid.geom, 4326))) AS lon,
+            AVG(grid.val) AS value
+        FROM (
+            SELECT
+                date_id::date AS date,
+                ST_SnapToGrid(ST_Transform((p).geom, 4326), 0.5, 0.5) AS geom,
+                (p).val AS val
+            FROM (
+                SELECT
+                    date_id,
+                    ST_PixelAsPolygons(ST_Clip(rast, ST_MakeEnvelope(:min_lon, :min_lat, :max_lon, :max_lat, 4326), true)) AS p
+                FROM {table_name}
+                WHERE date_id BETWEEN :start_date AND :end_date
+            ) AS sub
+        ) AS grid
+        WHERE grid.val IS NOT NULL
+        GROUP BY date, grid.geom
+        ORDER BY date;
+    """)
+
+    rows = (await db.execute(query, {
+        "min_lat": min_lat,
+        "min_lon": min_lon,
+        "max_lat": max_lat,
+        "max_lon": max_lon,
+        "start_date": start_date_obj,
+        "end_date": end_date_obj
+    })).mappings().all()
+
+    frames = {}
+    max_precip = 0
+
+    for row in rows:
+        date = row['date'].strftime('%Y-%m-%d')
+        if date not in frames:
+            frames[date] = []
+        frames[date].append({
+            "lat": row["lat"],
+            "lon": row["lon"],
+            "value": row["value"]
+        })
+        if row["value"] > max_precip:
+            max_precip = row["value"]
+
+    heatmap_frames = [
+        {"date": date, "points": points}
+        for date, points in sorted(frames.items())
+    ]
+
+    return {
+        "heatmap_frames": heatmap_frames,
+        "max_precip": max_precip
+    }
+    
+# Add an endpoint to serve the HTML
+@app.get("/ui/kepler", response_class=HTMLResponse)
+async def get_ui():
+    with open("static/timeseriesv4.html", "r") as f:
+        return f.read()    
+ 
+@app.get("/ui/heat", response_class=HTMLResponse)
+async def get_ui():
+    with open("static/heat.html", "r") as f:
+        return f.read()    
+       
+    
+# Add an endpoint to serve the HTML
+@app.get("/ui/chirps", response_class=HTMLResponse)
+async def get_ui():
+    with open("static/chirpsvizz.html", "r") as f:
+        return f.read()    
+    
+@app.get("/ui/nasapower", response_class=HTMLResponse)
+async def get_ui():
+    with open("static/nasapowervizz.html", "r") as f:
+        return f.read()    
+    

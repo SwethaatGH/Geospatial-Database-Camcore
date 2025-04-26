@@ -14,8 +14,8 @@
 - [ ] Scale Factors Add 
 - [ ] Date Validation
 - [ ] Latitude Validation
-- [ ] Add TerraClim
-- [ ] Add Soil Grids
-- [ ] Add elev
-- [ ] Add NASA Power
+- [X] Add TerraClim
+- [X] Add Soil Grids
+- [X] Add elev
+- [X] Add NASA Power
 

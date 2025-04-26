@@ -1,0 +1,80 @@
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #ffffff;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  color: #333;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.top-section {
+  display: flex;
+  height: 60%;
+}
+
+.map-container {
+  flex: 2;
+  position: relative;
+}
+
+.controls {
+  flex: 1;
+  padding: 20px;
+  background-color: #f5f5f5;
+  overflow-y: auto;
+}
+
+.chart-section {
+  height: 40%;
+  padding: 20px;
+  background-color: #fff;
+  border-top: 1px solid #ddd;
+}
+
+h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #333;
+}
+
+button {
+  cursor: pointer;
+}
+
+.coordinates {
+  margin-top: 15px;
+  padding: 10px;
+  background-color: #e9e9e9;
+  border-radius: 4px;
+}
+
+.error {
+  color: #d9534f;
+  margin-top: 10px;
+}
+
+.loading {
+  margin-top: 10px;
+  color: #666;
+}
+
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+}
