@@ -1,27 +1,22 @@
+""# main.py (fully integrated version)
 import time
 import math
+import os, shutil, subprocess, uuid, json
+from pathlib import Path
 from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, Depends, HTTPException, Query, File, UploadFile, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from .database import get_db
 from datetime import datetime, timedelta, date
 from enum import Enum
-import os, shutil, subprocess, uuid, json
-from pathlib import Path
-from .config import settings
 from shapely.geometry import box
 from shapely import wkt as shapely_wkt
-from fastapi.middleware.cors import CORSMiddleware
 
-
-# Ensure necessary directories exist
-os.makedirs("../Csv-Creator/uploads", exist_ok=True)
-os.makedirs("../Csv-Creator/processed", exist_ok=True)
-
-# Data source and variable enums
+# --- Enums and configs ---
 class DataSource(str, Enum):
     WORLDCLIM = "wc"
     SPEI = "spei"
@@ -29,7 +24,7 @@ class DataSource(str, Enum):
     ET = "et"
     ELEVATION = "elev"
     SOILGRIDS = "sg"
-    TERRACLIM = "tc" 
+    TERRACLIM = "tc"
     NASAPOWER = "np"
     ERA5 = "era5"
 
@@ -40,7 +35,6 @@ class Cadence(str, Enum):
     STATIC = "static"
     AGGREGATED = "aggregated"
 
-# Dictionary mapping data sources to their cadence
 DATA_SOURCE_CADENCE = {
     DataSource.WORLDCLIM: Cadence.MONTHLY,
     DataSource.SPEI: Cadence.MONTHLY,
@@ -53,7 +47,6 @@ DATA_SOURCE_CADENCE = {
     DataSource.ERA5: Cadence.DAILY,
 }
 
-# Data source table mapping
 DATA_SOURCE_TABLES = {
     DataSource.WORLDCLIM: "wc_data",
     DataSource.SPEI: "spei_data",
@@ -66,13 +59,12 @@ DATA_SOURCE_TABLES = {
     DataSource.ERA5: "era5_data"
 }
 
-# Available variables per data source
 AVAILABLE_VARIABLES = {
     DataSource.WORLDCLIM: ["prec", "tmax", "tmin"],
     DataSource.SPEI: ["spei"],
     DataSource.CHIRPS: ["chirps"],
     DataSource.ET: ["et"],
-    DataSource.ELEVATION: ["elev"],
+    DataSource.ELEVATION: ["elev"], 
     DataSource.SOILGRIDS: ["bdod", "cec", "cfvo", "clay", "nitrogen", "ocd", "ocs", "phh2o", "sand", "silt", "soc", "wv0010", "wv0030", "wv1500"],
     DataSource.TERRACLIM: ["aet", "def", "pdsi", "pet", "ppt", "q", "soil", "srad", "tmin", "vap", "vpd", "ws"],
     DataSource.NASAPOWER: ["airmass", "allsky_kt", "allsky_nkt", "allsky_sfc_lw_dwn", "allsky_sfc_lw_up", "allsky_sfc_par_diff", 
@@ -88,7 +80,6 @@ AVAILABLE_VARIABLES = {
                      "totprec", "uwind", "vwind", "volsowat1", "volsowat12", "volsowat13"]
 }
 
-# Data sources that use var_name column
 DATASOURCES_WITH_VARIABLES = [
     DataSource.WORLDCLIM,
     DataSource.TERRACLIM,
@@ -101,207 +92,97 @@ STATIC_DATA_SOURCES = [
     DataSource.SOILGRIDS,
 ]
 
-# Helper function to check if a table exists
-async def table_exists(db: AsyncSession, table_name: str) -> bool:
-    """Check if a table exists in the database."""
-    check_query = text(f"""
-        SELECT EXISTS (
-            SELECT FROM information_schema.tables 
-            WHERE table_name = '{table_name}'
-        );
-    """)
-    result = await db.execute(check_query)
-    return result.scalar()
+from app.climate_data_service import get_climate_data_timeseries_logic, table_exists
 
-# Initialize FastAPI app
+# --- App init ---
 app = FastAPI(title="Camcore Database API")
-  
-  
- # Add CORS middleware
-origins = [
-    "http://localhost:3000",    # React default development server
-    "http://localhost:5173",    # Vite default development server
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:5173",
-    # Add your production domains when ready
-    # "https://yourdomain.com",
-]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,      # List of allowed origins
-    allow_credentials=True,     # Allow cookies to be sent with requests
-    allow_methods=["*"],        # Allow all methods
-    allow_headers=["*"],        # Allow all headers
-) 
-  
-    
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# --- Endpoints ---
 @app.get("/")
 async def root():
-    return {
-        "message": "Welcome to the Camcore Database API",
-        "available_data_sources": {
-            "wc": "WorldClim (monthly: precipitation, tmax, tmin)",
-            "spei": "SPEI (monthly)",
-            "chirps": "CHIRPS (daily precipitation)",
-            "et": "Evapotranspiration (8-day cadence)",
-            "elev": "Elevation (static)",
-            "sg": "SoilGrids (static soil properties)",
-            "tc": "TerraClim (monthly climate data)",
-            "np": "NASA POWER (monthly climate and solar data)",
-            "era5": "ERA5 climate data",
-        }
-    }
+    return {"message": "Welcome to the Camcore Database API"}
 
 @app.get("/climate-data-timeseries/")
 async def get_climate_data_timeseries(
-    lat: float = Query(..., description="Latitude coordinate"),
-    lon: float = Query(..., description="Longitude coordinate"),
-    start_date: Optional[str] = Query(None, description="Start date in YYYY-MM-DD format"),
-    end_date: Optional[str] = Query(None, description="End date in YYYY-MM-DD format"),
-    variable: Optional[str] = Query(None, description="Specific variable to query (for SoilGrids only)"),
-    data_source: DataSource = Query(DataSource.WORLDCLIM, description="Data source"),
+    lat: float = Query(...),
+    lon: float = Query(...),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    variable: Optional[str] = Query(None),
+    data_source: DataSource = Query(DataSource.WORLDCLIM),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Get climate data time series for a specific location and time period.
-    Uses the new partitioned database structure.
-    """
-    # Check if start_date and end_date are required based on data source
-    if data_source not in [DataSource.ELEVATION, DataSource.SOILGRIDS]:
-        if start_date is None or end_date is None:
-            raise HTTPException(status_code=400, detail="start_date and end_date are required for time series data")
-   
-    # Convert string dates to datetime objects if they are provided
-    start_date_obj = None
-    end_date_obj = None
-    if start_date:
-        try:
-            start_date_obj = datetime.strptime(start_date, "%Y-%m-%d").date()
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid start_date format. Use YYYY-MM-DD")
-    
-    if end_date:
-        try:
-            end_date_obj = datetime.strptime(end_date, "%Y-%m-%d").date()
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid end_date format. Use YYYY-MM-DD")
+    return await get_climate_data_timeseries_logic(
+        lat=lat, lon=lon,
+        start_date=start_date, end_date=end_date,
+        data_source=data_source, variable=variable,
+        db=db
+    )
 
-    # For all other data sources
-    point_wkt = f"ST_SetSRID(ST_MakePoint({lon}, {lat}), 4326)"
-    table_name = DATA_SOURCE_TABLES.get(data_source)
-    
-    if not table_name:
-        raise HTTPException(status_code=400, detail=f"Unknown data source: {data_source}")
-    
-    if not await table_exists(db, table_name):
-        raise HTTPException(status_code=404, detail=f"No data available for {data_source.value}")
-    
+# CSV Processor Endpoint
+@app.post("/api/process-csv")
+async def process_csv(
+    file: UploadFile = File(...),
+    option: str = Form(...)
+):
+    job_id = str(uuid.uuid4())
+    upload_dir = Path(f"../Csv-Creator/uploads/{job_id}")
+    processed_dir = Path(f"../Csv-Creator/processed/{job_id}")
+    os.makedirs(upload_dir, exist_ok=True)
+    os.makedirs(processed_dir, exist_ok=True)
+
+    file_path = upload_dir / file.filename
     try:
-        # --- STATIC DATA SOURCES: Elevation, SoilGrids ---
-        if data_source in STATIC_DATA_SOURCES:
-            if data_source == DataSource.SOILGRIDS:
-                variables = AVAILABLE_VARIABLES.get(data_source, [])
-                query = text(f"""
-                    SELECT 
-                        {", ".join([f"MAX(CASE WHEN var_name = '{var}' THEN point_value END) AS {var}" for var in variables])}
-                    FROM (
-                        SELECT 
-                            var_name,
-                            ST_Value(rast, {point_wkt}) AS point_value
-                        FROM 
-                            {table_name}
-                        WHERE 
-                            ST_Intersects(rast, {point_wkt})
-                            AND var_name IN ({", ".join([f"'{var}'" for var in variables])})
-                    ) subquery
-                """)
-                result = await db.execute(query)
-                row = result.mappings().first()
-                return {
-                    "data_source": data_source.value,
-                    "location": {"lat": lat, "lon": lon},
-                    "values": {k: v for k, v in row.items() if v is not None} if row else {}
-                }
-                
-        # --- SOURCES WITH VAR_NAME COLUMN ---
-        elif data_source in DATASOURCES_WITH_VARIABLES:
-            variables = AVAILABLE_VARIABLES.get(data_source, [])
-            var_list = ", ".join([f"'{var}'" for var in variables])
-            query = text(f"""
-                SELECT 
-                    date_id,
-                    {", ".join([f"MAX(CASE WHEN var_name = '{var}' THEN point_value END) AS {var}" for var in variables])}
-                FROM (
-                    SELECT 
-                        date_id,
-                        var_name,
-                        ST_Value(rast, {point_wkt}) AS point_value
-                    FROM 
-                        {table_name}
-                    WHERE 
-                        date_id BETWEEN :start_date AND :end_date
-                        AND ST_Intersects(rast, {point_wkt})
-                        AND var_name IN ({var_list})
-                ) subquery
-                GROUP BY date_id
-                ORDER BY date_id
-            """)
-            result = await db.execute(query, {"start_date": start_date_obj, "end_date": end_date_obj})
-            rows = result.mappings().all()
-            
-        # --- SOURCES WITHOUT VAR_NAME COLUMN ---
-        else:
-            output_column = "prec"
-            if data_source == DataSource.SPEI:
-                output_column = "spei"
-            elif data_source == DataSource.ET:
-                output_column = "et"
-            
-            query = text(f"""
-                SELECT 
-                    date_id,
-                    ST_Value(rast, {point_wkt}) AS {output_column}
-                FROM 
-                    {table_name}
-                WHERE 
-                    date_id BETWEEN :start_date AND :end_date
-                    AND ST_Intersects(rast, {point_wkt})
-                ORDER BY date_id
-            """)
-            result = await db.execute(query, {"start_date": start_date_obj, "end_date": end_date_obj})
-            rows = result.mappings().all()
-            print(rows)
-        
-        # --- Format time series results ---
-        formatted_data = []
-        for row in rows:
-            
-            if row:
-                date_obj = row["date_id"]
-                formatted_row = {
-                    "date": date_obj.strftime("%Y-%m-%d"),
-                    "year": date_obj.year,
-                    "month": date_obj.month
-                }
-                if data_source == DataSource.CHIRPS:
-                    formatted_row["day"] = date_obj.day
-                formatted_row["values"] = {k: v for k, v in row.items() if k != "date_id" and v is not None}
-                formatted_data.append(formatted_row)
-                
-        return {
-            "data_source": data_source.value,
-            "location": {"lat": lat, "lon": lon},
-            "start_date": start_date,
-            "end_date": end_date,
-            "cadence": DATA_SOURCE_CADENCE.get(data_source, Cadence.MONTHLY).value,
-            "data": formatted_data
-        }
-    
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error saving file: {e}")
 
-    
+    raw_data_path = processed_dir / f"raw_data_{file.filename}"
+    covariates_path = processed_dir / f"covariates_{file.filename}"
+
+    try:
+        subprocess.run([
+            "python", "../Csv-Creator/script.py",
+            "--input", str(file_path),
+            "--output", str(raw_data_path),
+            "--default-start-date", "2000-01-01",
+            "--default-end-date", "2000-12-31",
+            "--all-variables",
+            "--cache-file", f"{processed_dir}/cache.json"
+        ], check=True)
+
+        if option == "full":
+            subprocess.run([
+                "python", "../Csv-Creator/covariablesv3.py",
+                "--input", str(raw_data_path),
+                "--output", str(covariates_path)
+            ], check=True)
+
+        return {
+            "message": "Processing complete.",
+            "jobId": job_id,
+            "rawDataFile": f"/download/{job_id}/raw_data_{file.filename}",
+            "covariatesFile": f"/download/{job_id}/covariates_{file.filename}" if option == "full" else None
+        }
+
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Processing error: {e}")
+
+@app.get("/download/{job_id}/{filename}")
+async def download_file(job_id: str, filename: str):
+    file_path = Path(f"../Csv-Creator/processed/{job_id}/{filename}")
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(path=file_path, filename=filename, media_type="application/octet-stream")    
     
 
 def sanitize_for_json(obj):
@@ -908,6 +789,10 @@ async def get_ui():
     with open("static/heat.html", "r") as f:
         return f.read()    
        
+@app.get("/CSVGenerator", response_class=HTMLResponse)
+async def get_csv_generator():
+    with open("static/csv_generator.html", "r") as f:
+        return f.read()
     
 # Add an endpoint to serve the HTML
 @app.get("/ui/chirps", response_class=HTMLResponse)
