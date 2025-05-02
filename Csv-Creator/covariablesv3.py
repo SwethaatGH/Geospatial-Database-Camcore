@@ -171,13 +171,16 @@ def calculate_precip_covariates(date_range, coordinates, precip_values):
 def extract_era5_covariates(df: pd.DataFrame) -> pd.DataFrame:
     all_results = []
 
-    for var in ["evaptrans", "latheat", "netsolrad", "press", "sktemp", "sotemp1", "sotemp2", "sotemp3", "temp", "uwind", "vwind", "volsowat1", "volsowat12", "volsowat13"]:
+    for var in ["evaptrans", "latheat", "netsolrad", "press", "sktemp", "sotemp1", "sotemp2", "sotemp3",
+                "temp", "uwind", "vwind", "volsowat1", "volsowat12", "volsowat13"]:
+        
         pattern = re.compile(rf"era5_{var}_(\d{{4}})-(\d{{2}})-(\d{{2}})")
         matching_cols = [col for col in df.columns if pattern.match(col)]
         if not matching_cols:
             continue
 
-        dates = [pd.to_datetime(pattern.match(col).group(1) + '-' + pattern.match(col).group(2) + '-' + pattern.match(col).group(3)) for col in matching_cols]
+        dates = [pd.to_datetime(f"{pattern.match(col).group(1)}-{pattern.match(col).group(2)}-{pattern.match(col).group(3)}")
+                 for col in matching_cols]
 
         for idx, row in tqdm(df.iterrows(), total=len(df), desc=f"Processing ERA5 {var} covariates"):
             lat = row['latitude']
@@ -191,12 +194,13 @@ def extract_era5_covariates(df: pd.DataFrame) -> pd.DataFrame:
             tmp_df['Season'] = tmp_df['Date'].apply(lambda d: get_season(d, hemisphere)[1])
 
             grouped = tmp_df.groupby(['Year', 'Season'])['Value']
-            summary = grouped.agg(['min', 'max', 'std']).reset_index()
-            std = grouped.std().reset_index(name="Std")
-            mean = grouped.mean().reset_index(name="Mean")
-            cv = (grouped.std() / grouped.mean()).reset_index(name="CV")
-
-            summary = std.merge(mean, on=['Year', 'Season']).merge(cv, on=['Year', 'Season'])
+            summary = grouped.agg(
+                min='min',
+                max='max',
+                std='std',
+                mean='mean'
+            ).reset_index()
+            summary['CV'] = summary['std'] / summary['mean']
 
             for _, row_cov in summary.iterrows():
                 result = {
@@ -204,12 +208,15 @@ def extract_era5_covariates(df: pd.DataFrame) -> pd.DataFrame:
                     'longitude': lon,
                     'year': int(row_cov['Year'])
                 }
-                for stat in ['min', 'max', 'std', 'CV']:
-                    season_code = row_cov['Season'][:2]
-                    result[f"ERA5_{var}_{stat}_{season_code}"] = row_cov[stat]
+                season_code = row_cov['Season'][:2]
+                result[f"ERA5_{var}_min_{season_code}"] = row_cov['min']
+                result[f"ERA5_{var}_max_{season_code}"] = row_cov['max']
+                result[f"ERA5_{var}_std_{season_code}"] = row_cov['std']
+                result[f"ERA5_{var}_CV_{season_code}"] = row_cov['CV']
                 all_results.append(result)
 
     return pd.DataFrame(all_results)
+
 
 def extract_era5_totprec(df: pd.DataFrame) -> pd.DataFrame:
     pattern = re.compile(r"era5_totprec_(\d{4})-(\d{2})-(\d{2})")
