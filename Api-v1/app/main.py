@@ -158,7 +158,6 @@ async def process_csv(
             "--output", str(raw_data_path),
             "--default-start-date", "2000-01-01",
             "--default-end-date", "2000-12-31",
-            "--all-variables",
             "--cache-file", f"{processed_dir}/cache.json"
         ], check=True)
 

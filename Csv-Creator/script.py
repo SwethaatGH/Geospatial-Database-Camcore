@@ -1,4 +1,3 @@
-# script.py (updated to match new service and main.py)
 import pandas as pd
 from datetime import datetime
 import time, json, argparse, hashlib, os
@@ -13,22 +12,15 @@ else:
     site_packages = os.path.join(venv_path, "lib", "python3.9", "site-packages")
 if os.path.exists(site_packages):
     sys.path.insert(0, site_packages)
-    print(f"Added site-packages to path: {site_packages}")
 
 # Add API source path
-import sys
-import os
-
-# Resolve path to Api-v1 and add it to sys.path
 api_v1_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Api-v1"))
 if api_v1_path not in sys.path:
     sys.path.insert(0, api_v1_path)
 
-# Imports
 from app.database import get_db
-from app.main import DataSource  # Use only DataSource enum
+from app.main import DataSource
 from app.climate_data_service import get_climate_data_timeseries_logic
-
 
 def convert_date_format(date_str):
     formats = ['%m/%d/%Y', '%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%Y/%m/%d']
@@ -39,6 +31,8 @@ def convert_date_format(date_str):
         except ValueError:
             continue
     return date_str
+
+STATIC_SOURCES = {'elev', 'soil'}
 
 DATA_SOURCES = {
     "wc": ["prec", "tmax", "tmin"],
@@ -61,11 +55,9 @@ DATA_SOURCES = {
              "totprec", "uwind", "vwind", "volsowat1", "volsowat12", "volsowat13"]
 }
 
-
 def save_cache(cache, cache_file_path):
     with open(cache_file_path, 'w') as f:
         json.dump(cache, f)
-
 
 def load_cache(cache_file_path):
     try:
@@ -73,7 +65,6 @@ def load_cache(cache_file_path):
             return json.load(f)
     except:
         return {}
-
 
 async def query_climate_data(lat, lon, start_date, end_date, data_source, variable=None, cache=None):
     cache_key = f"{lat}_{lon}_{start_date}_{end_date}_{data_source}_{variable}"
@@ -98,63 +89,46 @@ async def query_climate_data(lat, lon, start_date, end_date, data_source, variab
         cache[cache_hash] = result
     return result
 
-
-async def process_csv_file(input_csv_path, output_csv_path, default_start_date=None, default_end_date=None,
-                           process_all=False, cache_file_path="climate_data_cache.json"):
+async def process_csv_file(input_csv_path, output_csv_path, default_start_date=None, default_end_date=None, cache_file_path="climate_data_cache.json"):
     cache = load_cache(cache_file_path)
     df = pd.read_csv(input_csv_path)
     results_df = df.copy()
-    all_variable_dates = {}
-    processed_coords = {}
+    all_output_columns = set()
 
     for index, row in df.iterrows():
         lat = row['latitude']
         lon = row['longitude']
-        start_date = convert_date_format(row['data_final']) if 'data_final' in row and not pd.isna(row['data_final']) else default_start_date
-        end_date = convert_date_format(row['date_final']) if 'date_final' in row and not pd.isna(row['date_final']) else default_end_date
-        coord_key = f"{lat}_{lon}_{start_date}_{end_date}"
+        start_date = convert_date_format(row.get('data_final', default_start_date))
+        end_date = convert_date_format(row.get('date_final', default_end_date))
 
-        if coord_key in processed_coords:
-            for temp_key, api_response in processed_coords[coord_key].items():
-                results_df.at[index, temp_key] = api_response
-            continue
-
-        coord_api_responses = {}
         for source, variables in DATA_SOURCES.items():
             for var in variables:
                 data = await query_climate_data(lat, lon, start_date, end_date, source, var, cache)
-                if not data or 'values' not in data:
+                if not data or 'data' not in data:
                     continue
-                temp_key = f"_api_response_{source}_{var}"
-                results_df.at[index, temp_key] = json.dumps(data)
-                coord_api_responses[temp_key] = json.dumps(data)
-                for val in data['values']:
-                    date_str = val.get('date') or f"{val.get('year')}-{val.get('month'):02d}"
-                    col = f"{source}_{var}_{date_str}"
-                    all_variable_dates[col] = True
-        processed_coords[coord_key] = coord_api_responses
+                
+                for entry in data['data']:
+                    if source in STATIC_SOURCES:
+                        key = f"{source}_{entry['variable']}"
+                        results_df.at[index, key] = entry['value']
+                        all_output_columns.add(key)
+                    else:
+                        date_str = entry.get("date") or f"{entry['year']}-{entry['month']:02d}"
+                        for v, val in entry.get("values", {}).items():
+                            key = f"{source}_{v}_{date_str}"
+                            results_df.at[index, key] = val
+                            all_output_columns.add(key)
+
         time.sleep(0.1)
 
     save_cache(cache, cache_file_path)
 
-    for col in sorted(all_variable_dates.keys()):
-        results_df[col] = None
+    for col in sorted(all_output_columns):
+        if col not in results_df.columns:
+            results_df[col] = None
 
-    for index, row in results_df.iterrows():
-        for col in row.index:
-            if col.startswith('_api_response_') and pd.notna(row[col]):
-                data = json.loads(row[col])
-                for val in data['values']:
-                    date_str = val.get('date') or f"{val.get('year')}-{val.get('month'):02d}"
-                    value = val.get('value') or val.get('values', {}).get(data.get('variable', 'value'))
-                    key = f"{data['data_source']}_{data.get('variable', 'value')}_{date_str}"
-                    if key in results_df.columns:
-                        results_df.at[index, key] = value
-
-    results_df.drop(columns=[col for col in results_df.columns if col.startswith('_api_response_')], inplace=True)
     results_df.to_csv(output_csv_path, index=False)
     print(f"Saved output to {output_csv_path}")
-
 
 async def main():
     parser = argparse.ArgumentParser()
@@ -162,7 +136,6 @@ async def main():
     parser.add_argument('--output', default="forest_data_with_climate.csv")
     parser.add_argument('--default-start-date', default="2000-01-01")
     parser.add_argument('--default-end-date', default="2000-12-31")
-    parser.add_argument('--all-variables', action='store_true')
     parser.add_argument('--cache-file', default="climate_data_cache.json")
     args = parser.parse_args()
 
@@ -171,10 +144,8 @@ async def main():
         output_csv_path=args.output,
         default_start_date=args.default_start_date,
         default_end_date=args.default_end_date,
-        process_all=args.all_variables,
         cache_file_path=args.cache_file
     )
-
 
 if __name__ == "__main__":
     asyncio.run(main())
