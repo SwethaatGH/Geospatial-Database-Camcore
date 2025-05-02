@@ -2,6 +2,7 @@ import pandas as pd
 import re
 from tqdm import tqdm
 import argparse
+from datetime import datetime
 
 def get_hemisphere(latitude):
     return "southern" if latitude < 0 else "northern"
@@ -18,29 +19,102 @@ def get_season_monthly(month, hemisphere):
         if month in [6, 7, 8]: return "Winter"
         if month in [9, 10, 11]: return "Spring"
 
-
 def get_season(date, hemisphere):
-        month, day = date.month, date.day
-        year = date.year
-        if hemisphere == "northern":
-            if (month == 12 and day >= 15) or (month <= 3 and (month < 3 or day < 15)):
-                return year, "Winter"
-            elif (month == 3 and day >= 15) or (month <= 6 and (month < 6 or day < 15)):
-                return year, "Spring"
-            elif (month == 6 and day >= 15) or (month <= 9 and (month < 9 or day < 15)):
-                return year, "Summer"
-            elif (month == 9 and day >= 15) or (month <= 12 and (month < 12 or day < 15)):
-                return year, "Autumn"
-        else:
-            if (month == 12 and day >= 15) or (month <= 3 and (month < 3 or day < 15)):
-                return year, "Summer"
-            elif (month == 3 and day >= 15) or (month <= 6 and (month < 6 or day < 15)):
-                return year, "Autumn"
-            elif (month == 6 and day >= 15) or (month <= 9 and (month < 9 or day < 15)):
-                return year, "Winter"
-            elif (month == 9 and day >= 15) or (month <= 12 and (month < 12 or day < 15)):
-                return year, "Spring"
-        return None, None
+    month, day = date.month, date.day
+    year = date.year
+    if hemisphere == "northern":
+        if (month == 12 and day >= 15) or (month <= 3 and (month < 3 or day < 15)):
+            return year, "Winter"
+        elif (month == 3 and day >= 15) or (month <= 6 and (month < 6 or day < 15)):
+            return year, "Spring"
+        elif (month == 6 and day >= 15) or (month <= 9 and (month < 9 or day < 15)):
+            return year, "Summer"
+        elif (month == 9 and day >= 15) or (month <= 12 and (month < 12 or day < 15)):
+            return year, "Autumn"
+    else:
+        if (month == 12 and day >= 15) or (month <= 3 and (month < 3 or day < 15)):
+            return year, "Summer"
+        elif (month == 3 and day >= 15) or (month <= 6 and (month < 6 or day < 15)):
+            return year, "Autumn"
+        elif (month == 6 and day >= 15) or (month <= 9 and (month < 9 or day < 15)):
+            return year, "Winter"
+        elif (month == 9 and day >= 15) or (month <= 12 and (month < 12 or day < 15)):
+            return year, "Spring"
+    return None, None
+
+def extract_et_covariates(df: pd.DataFrame) -> pd.DataFrame:
+    pattern = re.compile(r"et_et_(\d{4})-(\d{2})")
+    et_columns = [col for col in df.columns if pattern.match(col)]
+    if not et_columns:
+        print("No ET columns found.")
+        return pd.DataFrame()
+
+    date_range = [pd.to_datetime("{}-{}-01".format(*pattern.match(col).groups())) for col in et_columns]
+    all_results = []
+
+    for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing ET seasonal covariates"):
+        lat = row['latitude']
+        lon = row['longitude']
+        hemisphere = get_hemisphere(lat)
+        values = row[et_columns].values.tolist()
+
+        tmp_df = pd.DataFrame({
+            'Date': date_range,
+            'ET': pd.to_numeric(values, errors='coerce')
+        })
+        tmp_df['Year'], tmp_df['Season'] = zip(*tmp_df['Date'].apply(lambda d: get_season(d, hemisphere)))
+        tmp_df = tmp_df[tmp_df['ET'].notna()]
+
+        grouped = tmp_df.groupby(['Year', 'Season'])['ET']
+        if grouped.size().empty:
+            continue
+
+        summary_df = grouped.agg(['min', 'max', 'std']).reset_index()
+        summary_df['CV'] = summary_df['std'] / grouped.mean().values
+
+        for _, row_cov in summary_df.iterrows():
+            result = {
+                'latitude': lat,
+                'longitude': lon,
+                'year': int(row_cov['Year'])
+            }
+            season_code = row_cov['Season'][:2]  # Wi, Sp, Su, Au
+            result[f'ET_Min_{season_code}'] = row_cov['min']
+            result[f'ET_Max_{season_code}'] = row_cov['max']
+            result[f'ET_Std_{season_code}'] = row_cov['std']
+            result[f'ET_CV_{season_code}'] = row_cov['CV']
+            all_results.append(result)
+
+    return pd.DataFrame(all_results)
+
+def extract_chirps_covariates_from_daily_columns(df: pd.DataFrame) -> pd.DataFrame:
+    chirps_columns = [col for col in df.columns if re.match(r"chirps_chirps_\d{4}-\d{2}-\d{2}", col)]
+    if not chirps_columns:
+        print("No CHIRPS daily columns found.")
+        return pd.DataFrame()
+
+    date_range = [pd.to_datetime(col.replace("chirps_chirps_", ""), format="%Y-%m-%d") for col in chirps_columns]
+
+    all_results = []
+
+    for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing CHIRPS seasonal covariates"):
+        lat = row['latitude']
+        lon = row['longitude']
+        precip_values = row[chirps_columns].values.tolist()
+        seasonal_df = calculate_precip_covariates(date_range, (lon, lat), precip_values)
+
+        for _, cov_row in seasonal_df.iterrows():
+            result = {
+                'latitude': lat,
+                'longitude': lon,
+                'year': cov_row['Year']
+            }
+            for col in cov_row.index:
+                if col not in ['Year', 'Location']:
+                    result[col] = cov_row[col]
+            all_results.append(result)
+
+    return pd.DataFrame(all_results)
 
 def calculate_precip_covariates(date_range, coordinates, precip_values):
     df = pd.DataFrame({"Date": pd.to_datetime(date_range), "Precipitation": precip_values})
@@ -90,70 +164,67 @@ def calculate_precip_covariates(date_range, coordinates, precip_values):
     ]
     seasonal_stats.columns = seasonal_stats.columns.str.replace("Autumn", "Au").str.replace("Spring", "Sp").str.replace("Winter", "Wi").str.replace("Summer", "Su")
     seasonal_stats = seasonal_stats.rename(
-        columns={col: f"CH_{col}" for col in seasonal_stats.columns if col not in ["Location", "Year"]}
+        columns={col: f"ERA5_{col}" for col in seasonal_stats.columns if col not in ["Location", "Year"]}
     )
     return seasonal_stats
 
-def extract_et_covariates(df: pd.DataFrame) -> pd.DataFrame:
-    pattern = re.compile(r"et_et_(\d{4})-(\d{2})")
-    et_columns = [col for col in df.columns if pattern.match(col)]
-    if not et_columns:
-        print("No ET columns found.")
-        return pd.DataFrame()
-
-    date_range = [pd.to_datetime("{}-{}-01".format(*pattern.match(col).groups())) for col in et_columns]
+def extract_era5_covariates(df: pd.DataFrame) -> pd.DataFrame:
     all_results = []
 
-    for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing ET seasonal covariates"):
-        lat = row['latitude']
-        lon = row['longitude']
-        hemisphere = get_hemisphere(lat)
-        values = row[et_columns].values.tolist()
-
-        tmp_df = pd.DataFrame({
-            'Date': date_range,
-            'ET': pd.to_numeric(values, errors='coerce')
-        })
-        tmp_df['Year'], tmp_df['Season'] = zip(*tmp_df['Date'].apply(lambda d: get_season(d, hemisphere)))
-        tmp_df = tmp_df[tmp_df['ET'].notna()]
-
-        grouped = tmp_df.groupby(['Year', 'Season'])['ET']
-        if grouped.size().empty:
+    for var in ["evaptrans", "latheat", "netsolrad", "press", "sktemp", "sotemp1", "sotemp2", "sotemp3", "temp", "uwind", "vwind", "volsowat1", "volsowat12", "volsowat13"]:
+        pattern = re.compile(rf"era5_{var}_(\d{{4}})-(\d{{2}})-(\d{{2}})")
+        matching_cols = [col for col in df.columns if pattern.match(col)]
+        if not matching_cols:
             continue
 
-        summary_df = grouped.agg(['min', 'max', 'std']).reset_index()
-        summary_df['CV'] = summary_df['std'] / grouped.mean().values
+        dates = [pd.to_datetime(pattern.match(col).group(1) + '-' + pattern.match(col).group(2) + '-' + pattern.match(col).group(3)) for col in matching_cols]
 
-        for _, row_cov in summary_df.iterrows():
-            result = {
-                'latitude': lat,
-                'longitude': lon,
-                'year': int(row_cov['Year'])
-            }
-            season_code = row_cov['Season'][:2]  # Wi, Sp, Su, Au
-            result[f'ET_Min_{season_code}'] = row_cov['min']
-            result[f'ET_Max_{season_code}'] = row_cov['max']
-            result[f'ET_Std_{season_code}'] = row_cov['std']
-            result[f'ET_CV_{season_code}'] = row_cov['CV']
-            all_results.append(result)
+        for idx, row in tqdm(df.iterrows(), total=len(df), desc=f"Processing ERA5 {var} covariates"):
+            lat = row['latitude']
+            lon = row['longitude']
+            hemisphere = get_hemisphere(lat)
+            values = pd.to_numeric(row[matching_cols].values.tolist(), errors='coerce')
+
+            tmp_df = pd.DataFrame({'Date': dates, 'Value': values})
+            tmp_df = tmp_df.dropna()
+            tmp_df['Year'] = tmp_df['Date'].dt.year
+            tmp_df['Season'] = tmp_df['Date'].apply(lambda d: get_season(d, hemisphere)[1])
+
+            grouped = tmp_df.groupby(['Year', 'Season'])['Value']
+            summary = grouped.agg(['min', 'max', 'std']).reset_index()
+            std = grouped.std().reset_index(name="Std")
+            mean = grouped.mean().reset_index(name="Mean")
+            cv = (grouped.std() / grouped.mean()).reset_index(name="CV")
+
+            summary = std.merge(mean, on=['Year', 'Season']).merge(cv, on=['Year', 'Season'])
+
+            for _, row_cov in summary.iterrows():
+                result = {
+                    'latitude': lat,
+                    'longitude': lon,
+                    'year': int(row_cov['Year'])
+                }
+                for stat in ['min', 'max', 'std', 'CV']:
+                    season_code = row_cov['Season'][:2]
+                    result[f"ERA5_{var}_{stat}_{season_code}"] = row_cov[stat]
+                all_results.append(result)
 
     return pd.DataFrame(all_results)
 
-
-def extract_chirps_covariates_from_daily_columns(df: pd.DataFrame) -> pd.DataFrame:
-    chirps_columns = [col for col in df.columns if re.match(r"chirps_chirps_\d{4}-\d{2}-\d{2}", col)]
-    if not chirps_columns:
-        print("No CHIRPS daily columns found.")
+def extract_era5_totprec(df: pd.DataFrame) -> pd.DataFrame:
+    pattern = re.compile(r"era5_totprec_(\d{4})-(\d{2})-(\d{2})")
+    matching_columns = [col for col in df.columns if pattern.match(col)]
+    if not matching_columns:
+        print("No ERA5 totprec columns found.")
         return pd.DataFrame()
 
-    date_range = [pd.to_datetime(col.replace("chirps_chirps_", ""), format="%Y-%m-%d") for col in chirps_columns]
+    date_range = [pd.to_datetime("{}-{}-{}".format(*pattern.match(col).groups())) for col in matching_columns]
 
     all_results = []
-
-    for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing CHIRPS seasonal covariates"):
+    for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing ERA5 totprec seasonal covariates"):
         lat = row['latitude']
         lon = row['longitude']
-        precip_values = row[chirps_columns].values.tolist()
+        precip_values = row[matching_columns].values.tolist()
         seasonal_df = calculate_precip_covariates(date_range, (lon, lat), precip_values)
 
         for _, cov_row in seasonal_df.iterrows():
@@ -169,7 +240,6 @@ def extract_chirps_covariates_from_daily_columns(df: pd.DataFrame) -> pd.DataFra
 
     return pd.DataFrame(all_results)
 
-
 def extract_monthly_covariates(df: pd.DataFrame, source: str, variables: list, prefix: str) -> pd.DataFrame:
     all_results = []
 
@@ -182,7 +252,7 @@ def extract_monthly_covariates(df: pd.DataFrame, source: str, variables: list, p
 
         date_range = [pd.to_datetime("{}-{}-01".format(*pattern.match(col).groups())) for col in matching_columns]
 
-        for idx, row in tqdm(df.iterrows(), total=len(df), desc=f"Processing {source.upper()} {var} covariates"):
+        for idx, row in tqdm(df.iterrows(), total=len(df), desc=f"Processing {prefix} {var} covariates"):
             lat = row['latitude']
             lon = row['longitude']
             hemisphere = get_hemisphere(lat)
@@ -190,12 +260,11 @@ def extract_monthly_covariates(df: pd.DataFrame, source: str, variables: list, p
 
             tmp_df = pd.DataFrame({
                 'Date': date_range,
-                'Value': values
+                'Value': pd.to_numeric(values, errors='coerce')
             })
             tmp_df['Year'] = tmp_df['Date'].dt.year
             tmp_df['Season'] = tmp_df['Date'].dt.month.apply(lambda m: get_season_monthly(m, hemisphere))
-            # tmp_df['Value'] = pd.to_numeric(tmp_df['Value'], errors='coerce')
-            # tmp_df = tmp_df[tmp_df['Value'].notna()]
+            tmp_df = tmp_df[tmp_df['Value'].notna()]
 
             group = tmp_df.groupby(['Year', 'Season'])['Value']
             summary = {
@@ -215,21 +284,19 @@ def extract_monthly_covariates(df: pd.DataFrame, source: str, variables: list, p
                     'year': int(row_cov['Year'])
                 }
                 for col in summary_df.columns[2:]:
-                    season_code = row_cov['Season'][:2]  # Wi, Sp, Su, Au
+                    season_code = row_cov['Season'][:2]
                     key = f"{prefix}_{var}_{col}_{season_code}"
                     result[key] = row_cov[col]
                 all_results.append(result)
 
     return pd.DataFrame(all_results)
 
-
 def main():
-    parser = argparse.ArgumentParser(description="Extract seasonal climate covariates from a CSV file.")
-    parser.add_argument('--input', default="forest_data_with_climate.csv", type=str, help='Input CSV file with climate columns')
-    parser.add_argument('--output', default="forest_data_with_covariates.csv", type=str, help='Output CSV with seasonal covariates')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--input', default="forest_data_with_climate.csv")
+    parser.add_argument('--output', default="forest_data_with_covariates.csv")
     args = parser.parse_args()
 
-    # Load input CSV
     try:
         df = pd.read_csv(args.input)
         print(f"Loaded input CSV with {len(df)} rows.")
@@ -237,49 +304,39 @@ def main():
         print(f"Failed to load input CSV: {e}")
         return
 
-    # Extract CHIRPS daily precipitation covariates
     chirps_df = extract_chirps_covariates_from_daily_columns(df)
-
-    # Extract WC monthly covariates (prec, tmax, tmin)
-    wc_df = extract_monthly_covariates(df, source='wc', variables=["prec", "tmax", "tmin"], prefix='WC')
-
-    # Extract SPEI monthly covariates (spei)
-    spei_df = extract_monthly_covariates(df, source='spei', variables=["spei"], prefix='SPEI')
-
-    # Extract ET monthly covariates 
     et_df = extract_et_covariates(df)
+    wc_df = extract_monthly_covariates(df, 'wc', ["prec", "tmax", "tmin"], 'WC')
+    spei_df = extract_monthly_covariates(df, 'spei', ["spei"], 'SPEI')
+    tc_df = extract_monthly_covariates(df, 'tc', ["aet", "def", "pdsi", "pet", "ppt", "q", "soil", "srad", "tmin", "vap", "vpd", "ws"], 'TC')
+    np_df = extract_monthly_covariates(df, 'np', ["airmass", "allsky_kt", "allsky_nkt", "allsky_sfc_lw_dwn", "allsky_sfc_lw_up", "allsky_sfc_par_diff",
+           "allsky_sfc_par_dirh", "allsky_sfc_par_tot", "allsky_sfc_sw_diff", "allsky_sfc_sw_dirh", "allsky_sfc_sw_dni",
+           "allsky_sfc_sw_dwn", "allsky_sfc_sw_up", "allsky_sfc_uv_index", "allsky_sfc_uva", "allsky_sfc_uvb",
+           "allsky_srf_alb", "aod_55", "aod_55_adj", "aod_84", "cloud_amt", "cloud_amt_day", "cloud_amt_night",
+           "cloud_od", "clrsky_days", "clrsky_kt", "clrsky_nkt", "clrsky_sfc_lw_dwn", "clrsky_sfc_lw_up",
+           "clrsky_sfc_par_diff", "clrsky_sfc_par_dirh", "clrsky_sfc_par_tot", "clrsky_sfc_sw_diff",
+           "clrsky_sfc_sw_dirh", "clrsky_sfc_sw_dni", "clrsky_sfc_sw_dwn", "clrsky_sfc_sw_up", "clrsky_srf_alb",
+           "midday_insol", "original_allsky_sfc_sw_diff", "original_allsky_sfc_sw_dirh", "psh", "pw",
+           "srf_alb_adj", "toa_sw_dni", "toa_sw_dwn", "ts_adj"], 'NP')
+    era5_p_df = extract_era5_totprec(df)
+    era5_rest_df = extract_era5_covariates(df)
 
-    # Merge all results
-    # Merge all results (deduplicate before merging)
-    dfs_to_merge = [chirps_df, wc_df, spei_df, et_df]
+    dfs = [chirps_df, et_df, wc_df, spei_df, tc_df, np_df, era5_p_df, era5_rest_df]
+    for i, d in enumerate(dfs):
+        if d is not None and not d.empty:
+            dfs[i] = d.groupby(['latitude', 'longitude', 'year']).first().reset_index()
 
-    # Group each df to ensure one row per (lat, lon, year)
-    for i, df_part in enumerate(dfs_to_merge):
-        if df_part is not None and not df_part.empty:
-            dfs_to_merge[i] = df_part.groupby(['latitude', 'longitude', 'year']).first().reset_index()
-
-    # Merge all DataFrames on (lat, lon, year)
     from functools import reduce
-    merged_df = reduce(lambda left, right: pd.merge(left, right, on=['latitude', 'longitude', 'year'], how='outer'), 
-                    [df for df in dfs_to_merge if not df.empty])
+    merged_df = reduce(lambda left, right: pd.merge(left, right, on=['latitude', 'longitude', 'year'], how='outer'), [d for d in dfs if not d.empty])
 
-
-    # Save the final merged output
-    # Save the final merged output
     if merged_df is not None and not merged_df.empty:
-
-        # 🔧 Clean integer 0s after merge
-        def replace_strict_zero_with_nan(series):
-            return series.apply(lambda x: pd.NA if isinstance(x, int) and x == 0 else x)
-
         for col in merged_df.columns:
-            if col.startswith('WC_') or col.startswith('SPEI_'):
+            if col.startswith(('WC_', 'SPEI_', 'TC_', 'NP_')):
                 merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce')
-                merged_df[col] = replace_strict_zero_with_nan(merged_df[col])
+                merged_df[col] = merged_df[col].apply(lambda x: pd.NA if isinstance(x, int) and x == 0 else x)
 
         merged_df.to_csv(args.output, index=False)
         print(f"✅ Saved merged seasonal covariates to {args.output}")
-
     else:
         print("⚠️ No covariates were generated. Output not saved.")
 

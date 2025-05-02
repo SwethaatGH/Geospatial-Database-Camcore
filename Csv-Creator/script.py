@@ -3,6 +3,7 @@ from datetime import datetime
 import time, json, argparse, hashlib, os
 import asyncio
 import sys
+from tqdm import tqdm
 
 # Add virtual environment site-packages to path
 venv_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Api-v1", "venv"))
@@ -93,42 +94,55 @@ async def process_csv_file(input_csv_path, output_csv_path, default_start_date=N
     cache = load_cache(cache_file_path)
     df = pd.read_csv(input_csv_path)
     results_df = df.copy()
-    all_output_columns = set()
+    new_columns = set()
 
-    for index, row in df.iterrows():
+    all_rows_updates = []
+
+    for index, row in tqdm(df.iterrows(), total=len(df), desc="Processing rows"):
         lat = row['latitude']
         lon = row['longitude']
         start_date = convert_date_format(row.get('data_final', default_start_date))
         end_date = convert_date_format(row.get('date_final', default_end_date))
+
+        row_updates = {}
 
         for source, variables in DATA_SOURCES.items():
             for var in variables:
                 data = await query_climate_data(lat, lon, start_date, end_date, source, var, cache)
                 if not data or 'data' not in data:
                     continue
-                
+
                 for entry in data['data']:
                     if source in STATIC_SOURCES:
                         key = f"{source}_{entry['variable']}"
-                        results_df.at[index, key] = entry['value']
-                        all_output_columns.add(key)
+                        row_updates[key] = entry['value']
+                        new_columns.add(key)
                     else:
                         date_str = entry.get("date") or f"{entry['year']}-{entry['month']:02d}"
                         for v, val in entry.get("values", {}).items():
                             key = f"{source}_{v}_{date_str}"
-                            results_df.at[index, key] = val
-                            all_output_columns.add(key)
+                            row_updates[key] = val
+                            new_columns.add(key)
 
-        time.sleep(0.1)
+        all_rows_updates.append(row_updates)
+        time.sleep(0.05)
+
+    # Add new columns to avoid fragmentation
+    for col in sorted(new_columns):
+        if col not in results_df.columns:
+            results_df[col] = pd.NA
+
+    # Apply all updates efficiently
+    for i, updates in enumerate(all_rows_updates):
+        if updates:
+            for key, value in updates.items():
+                results_df.iat[i, results_df.columns.get_loc(key)] = value
 
     save_cache(cache, cache_file_path)
 
-    for col in sorted(all_output_columns):
-        if col not in results_df.columns:
-            results_df[col] = None
-
     results_df.to_csv(output_csv_path, index=False)
-    print(f"Saved output to {output_csv_path}")
+    print(f"✅ Saved output to {output_csv_path}")
+
 
 async def main():
     parser = argparse.ArgumentParser()
