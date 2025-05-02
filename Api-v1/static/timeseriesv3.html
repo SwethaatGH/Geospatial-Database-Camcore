@@ -334,6 +334,13 @@
                 dateControls.style.display = 'block';
             } else if (dataSource === 'elev') {
                 addOption(variableSelect, 'elev', 'Elevation');
+                addOption(variableSelect, 'slope', 'Slope');
+                addOption(variableSelect, 'aspect', 'Aspect');
+                addOption(variableSelect, 'tpi', 'Topographic Position Index');
+                addOption(variableSelect, 'tri', 'Terrain Ruggedness Index');
+                addOption(variableSelect, 'roughness', 'Roughness');
+                addOption(variableSelect, 'flowdir', 'Flow Direction');
+                addOption(variableSelect, 'hillshade', 'Hillshade');
                 dateControls.style.display = 'none';
             } else if (dataSource === 'sg') {
                 addOption(variableSelect, 'bdod', 'Bulk Density');
@@ -510,7 +517,7 @@
             let apiUrl = '';
             if (dataSource === 'elev' || dataSource === 'sg') {
                 // For static data sources
-                apiUrl = `/climate-data-timeseries/?lat=${selectedPoint.lat}&lon=${selectedPoint.lon}&data_source=${dataSource}`;
+                apiUrl = `/climate-data-timeseries/?lat=${selectedPoint.lat}&lon=${selectedPoint.lon}&data_source=${dataSource}&variable=${variable}`;
             } else {
                 // For time series data
                 const startDate = document.getElementById('start-date').value;
@@ -565,7 +572,7 @@
             // For static data sources (elevation, soilgrids)
             if (dataSource === 'elev' || dataSource === 'sg') {
                 // Static data sources don't need date parameters
-                apiUrl = `/climate-data-timeseries-bbox-sampled/?min_lat=${bboxCoordinates.min_lat}&min_lon=${bboxCoordinates.min_lon}&max_lat=${bboxCoordinates.max_lat}&max_lon=${bboxCoordinates.max_lon}&data_source=${dataSource}`;
+                apiUrl = `/climate-data-timeseries-bbox-sampled/?min_lat=${bboxCoordinates.min_lat}&min_lon=${bboxCoordinates.min_lon}&max_lat=${bboxCoordinates.max_lat}&max_lon=${bboxCoordinates.max_lon}&data_source=${dataSource}&variable=${variable}`;
                 // Add variable if it's SoilGrids (has multiple variables)
                 if (dataSource === 'sg') {
                     apiUrl += `&variable=${variable}`;
@@ -896,149 +903,149 @@
         }
         // Function to display static data for a single point (modified to handle multiple soil properties)
         function displayStaticData(data, dataSource) {
-            // Create a context for the chart
-            const ctx = document.getElementById('timeSeriesChart').getContext('2d');
-            // Destroy previous chart if exists
-            if (timeSeriesChart) {
-                timeSeriesChart.destroy();
-            }
-            // For SoilGrids data, we'll create a grouped bar chart showing all values
-            if (dataSource === 'sg') {
-                // Extract soil properties 
-                const soilProperties = Object.keys(data.values);
-                // Create datasets
-                const datasets = soilProperties.map(property => {
-                    return {
-                        label: getVariableLabel(property, dataSource),
-                        data: [data.values[property]],
-                        backgroundColor: getChartColor(property, 0.6),
-                        borderColor: getChartColor(property),
-                        borderWidth: 1
-                    };
-                });
-                // Create the chart
-                timeSeriesChart = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: ['Soil Properties'],
-                        datasets: datasets
+    const ctx = document.getElementById('timeSeriesChart').getContext('2d');
+    if (timeSeriesChart) {
+        timeSeriesChart.destroy();
+    }
+
+    const isMulti = Array.isArray(data.data) && data.data.length > 1;
+    const isSingle = Array.isArray(data.data) && data.data.length === 1;
+
+    if ((dataSource === 'sg' || dataSource === 'elev') && isMulti) {
+        // Multiple variables returned (e.g., all of soilgrids or elevation derivatives)
+        const properties = data.data.map(d => d.variable);
+        const datasets = data.data.map(d => ({
+            label: getVariableLabel(d.variable, dataSource),
+            data: [d.value],
+            backgroundColor: getChartColor(d.variable, 0.6),
+            borderColor: getChartColor(d.variable),
+            borderWidth: 1
+        }));
+
+        timeSeriesChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Static Variables'],
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        title: {
+                            display: true,
+                            text: 'Value'
+                        }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: `${dataSource === 'sg' ? 'Soil' : 'Elevation'} Variables at Lat: ${data.location.lat}, Lon: ${data.location.lon}`
                     },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            y: {
-                                beginAtZero: false,
-                                title: {
-                                    display: true,
-                                    text: 'Value'
-                                }
-                            }
-                        },
-                        plugins: {
-                            title: {
-                                display: true,
-                                text: `Soil Properties at Lat: ${data.location.lat}, Lon: ${data.location.lon}`
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function (context) {
-                                        const property = soilProperties[context.datasetIndex];
-                                        return `${context.dataset.label}: ${context.raw} ${getUnitLabel(property, dataSource)}`;
-                                    }
-                                }
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                const variable = properties[context.datasetIndex];
+                                return `${context.dataset.label}: ${context.raw} ${getUnitLabel(variable, dataSource)}`;
                             }
                         }
                     }
-                });
-            } else {
-                // For other static data (like elevation), use the original code
-                const variable = document.getElementById('variable-point').value;
-                timeSeriesChart = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: [getVariableLabel(variable, dataSource)],
-                        datasets: [{
-                            label: getVariableLabel(variable, dataSource),
-                            data: [data.values[variable]],
-                            backgroundColor: getChartColor(variable, 0.6),
-                            borderColor: getChartColor(variable),
-                            borderWidth: 1
-                        }]
+                }
+            }
+        });
+    } else if (isSingle) {
+        // Only one variable returned
+        const variable = data.data[0].variable;
+        const value = data.data[0].value;
+
+        timeSeriesChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: [getVariableLabel(variable, dataSource)],
+                datasets: [{
+                    label: getVariableLabel(variable, dataSource),
+                    data: [value],
+                    backgroundColor: getChartColor(variable, 0.6),
+                    borderColor: getChartColor(variable),
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        title: {
+                            display: true,
+                            text: getUnitLabel(variable, dataSource)
+                        }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: `${getVariableLabel(variable, dataSource)} at Lat: ${data.location.lat}, Lon: ${data.location.lon}`
                     },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            y: {
-                                beginAtZero: false,
-                                title: {
-                                    display: true,
-                                    text: getUnitLabel(variable, dataSource)
-                                }
-                            }
-                        },
-                        plugins: {
-                            title: {
-                                display: true,
-                                text: `${getVariableLabel(variable, dataSource)} at Lat: ${data.location.lat}, Lon: ${data.location.lon}`
-                            },
-                            legend: {
-                                display: false
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function (context) {
-                                        return `${context.dataset.label}: ${context.raw} ${getUnitLabel(variable, dataSource)}`;
-                                    }
-                                }
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                return `${context.dataset.label}: ${context.raw} ${getUnitLabel(variable, dataSource)}`;
                             }
                         }
                     }
-                });
+                }
             }
-        }
+        });
+    } else {
+        console.error("Unexpected or missing data format:", data);
+        alert("No valid static data available for this location.");
+    }
+}
+
+
+
 
         // Update the fetch point data button click handler to use the modified API URL
         document.getElementById('fetch-point-data').addEventListener('click', async function () {
-            // Check if a point is selected
             if (!selectedPoint) {
                 showError('Please select a point on the map first.');
                 return;
             }
-            // Get form values
+
             const dataSource = document.getElementById('data-source-point').value;
-            // Build API URL base
-            let apiUrl = '';
+            const variable = document.getElementById('variable-point').value;
+            let apiUrl = ''; // <-- keep this
+
             if (dataSource === 'elev' || dataSource === 'sg') {
-                // For static data sources - no variable parameter needed
-                apiUrl = `/climate-data-timeseries/?lat=${selectedPoint.lat}&lon=${selectedPoint.lon}&data_source=${dataSource}`;
+                apiUrl = `/climate-data-timeseries/?lat=${selectedPoint.lat}&lon=${selectedPoint.lon}&data_source=${dataSource}&variable=${variable}`;
             } else {
-                // For time series data
                 const startDate = document.getElementById('start-date').value;
                 const endDate = document.getElementById('end-date').value;
-                const variable = document.getElementById('variable-point').value;
-                // Validate dates
                 if (!startDate || !endDate) {
                     showError('Please select start and end dates.');
                     return;
                 }
                 apiUrl = `/climate-data-timeseries/?lat=${selectedPoint.lat}&lon=${selectedPoint.lon}&start_date=${startDate}&end_date=${endDate}&data_source=${dataSource}&variable=${variable}`;
-
             }
-            // Show loading
+
             document.getElementById('loading').style.display = 'block';
             document.getElementById('error').textContent = '';
+
             try {
-                // Fetch data
                 const response = await fetch(apiUrl);
                 if (!response.ok) {
                     const errorData = await response.json();
                     throw new Error(errorData.detail || 'Failed to fetch data');
                 }
                 const data = await response.json();
-                console.log(data); // Log the data for debugging
-                // Process and display the data
+                console.log(data);
                 if (dataSource === 'elev' || dataSource === 'sg') {
                     displayStaticData(data, dataSource);
                 } else {
@@ -1047,10 +1054,10 @@
             } catch (error) {
                 showError(error.message);
             } finally {
-                // Hide loading
                 document.getElementById('loading').style.display = 'none';
             }
         });
+
         // Updated fetch bounding box data button click handler
         document.getElementById('fetch-bbox-data').addEventListener('click', async function () {
             // Check if a bounding box is selected
@@ -1130,6 +1137,13 @@
                 'spei': `rgba(50, 205, 50, ${alpha})`,
                 'et': `rgba(128, 0, 128, ${alpha})`,
                 'elev': `rgba(139, 69, 19, ${alpha})`,
+                'slope': `rgba(205, 92, 92, ${alpha})`,
+                'aspect': `rgba(218, 165, 32, ${alpha})`,
+                'tpi': `rgba(154, 205, 50, ${alpha})`,
+                'tri': `rgba(106, 90, 205, ${alpha})`,
+                'roughness': `rgba(72, 61, 139, ${alpha})`,
+                'flowdir': `rgba(0, 139, 139, ${alpha})`,
+                'hillshade': `rgba(119, 136, 153, ${alpha})`,
                 'bdod': `rgba(165, 42, 42, ${alpha})`,
                 'cec': `rgba(255, 140, 0, ${alpha})`,
                 'cfvo': `rgba(128, 128, 0, ${alpha})`,
@@ -1145,6 +1159,7 @@
                 'wv0030': `rgba(70, 130, 180, ${alpha})`,
                 'wv1500': `rgba(25, 25, 112, ${alpha})`
             };
+
             return colors[variable] || `rgba(100, 100, 100, ${alpha})`;
         }
         function getVariableLabel(variable, dataSource) {
@@ -1156,6 +1171,13 @@
                 'spei': 'SPEI',
                 'et': 'Evapotranspiration',
                 'elev': 'Elevation',
+                'slope': 'Slope',
+                'aspect': 'Aspect',
+                'tpi': 'Topographic Position Index',
+                'tri': 'Terrain Ruggedness Index',
+                'roughness': 'Surface Roughness',
+                'flowdir': 'Flow Direction',
+                'hillshade': 'Hillshade',
                 'bdod': 'Bulk Density',
                 'cec': 'Cation Exchange Capacity',
                 'cfvo': 'Coarse Fragments Volumetric',
@@ -1169,22 +1191,7 @@
                 'soc': 'Soil Organic Carbon',
                 'wv0010': 'Water Vapor Content at 10cm',
                 'wv0030': 'Water Vapor Content at 30cm',
-                'wv1500': 'Water Vapor Content at 1500cm',
-                // TerraClim variables
-                'aet': 'Actual Evapotranspiration',
-                'def': 'Water Deficit',
-                'pdsi': 'Palmer Drought Severity Index',
-                'pet': 'Potential Evapotranspiration',
-                'ppt': 'Precipitation',
-                'q': 'Runoff',
-                'soil': 'Soil Moisture',
-                'srad': 'Solar Radiation',
-                'vap': 'Vapor Pressure',
-                'vpd': 'Vapor Pressure Deficit',
-                'ws': 'Wind Speed',
-                // NASA POWER variables
-                'allsky_sfc_sw_dwn': 'All-Sky Surface SW Down'
-                // Add more as needed
+                'wv1500': 'Water Vapor Content at 1500cm'
             };
             return labels[variable] || variable;
         }
@@ -1197,6 +1204,20 @@
                 return 'index';
             } else if (variable === 'elev') {
                 return 'm';
+            } else if (variable === 'slope') {
+                return 'degrees';
+            } else if (variable === 'aspect') {
+                return 'degrees';
+            } else if (variable === 'tpi') {
+                return 'm';
+            } else if (variable === 'tri') {
+                return '';
+            } else if (variable === 'roughness') {
+                return 'm';
+            } else if (variable === 'flowdir') {
+                return 'direction';
+            } else if (variable === 'hillshade') {
+                return '';
             } else if (variable === 'bdod') {
                 return 'kg/dm³';
             } else if (variable === 'cec') {

@@ -47,11 +47,32 @@ async def get_climate_data_timeseries_logic(
 
     try:
         if data_source in STATIC_DATA_SOURCES:
-            if data_source == DataSource.SOILGRIDS:
+            if variable:
+                # Only query for the single requested variable
+                query = text(f"""
+                    SELECT 
+                        MAX(CASE WHEN var_name = :variable THEN point_value END) AS value
+                    FROM (
+                        SELECT 
+                            var_name,
+                            ST_Value(rast, {point_wkt}) AS point_value
+                        FROM 
+                            {table_name}
+                        WHERE 
+                            ST_Intersects(rast, {point_wkt})
+                            AND var_name = :variable
+                    ) sub
+                """)
+                row = (await db.execute(query, {"variable": variable})).mappings().first()
+                if row and row["value"] is not None:
+                    result["data"] = [{"variable": variable, "value": row["value"]}]
+                return result
+            else:
+                # Fetch all available variables
                 variables = AVAILABLE_VARIABLES.get(data_source, [])
                 query = text(f"""
                     SELECT 
-                        {", ".join([f"MAX(CASE WHEN var_name = '{var}' THEN point_value END) AS {var}" for var in variables])}
+                        {", ".join([f"MAX(CASE WHEN var_name = '{v}' THEN point_value END) AS {v}" for v in variables])}
                     FROM (
                         SELECT 
                             var_name,
@@ -65,17 +86,9 @@ async def get_climate_data_timeseries_logic(
                 """)
                 row = (await db.execute(query)).mappings().first()
                 result["data"] = [{"variable": var, "value": row[var]} for var in variables if row[var] is not None]
-            else:
-                query = text(f"""
-                    SELECT ST_Value(rast, {point_wkt}) AS value
-                    FROM {table_name}
-                    WHERE ST_Intersects(rast, {point_wkt})
-                    LIMIT 1
-                """)
-                row = (await db.execute(query)).mappings().first()
-                if row and row["value"] is not None:
-                    result["data"] = [{"value": row["value"]}]
-            return result
+                return result
+
+
 
         elif data_source in DATASOURCES_WITH_VARIABLES:
             variables = [variable] if variable else AVAILABLE_VARIABLES.get(data_source, [])
@@ -119,11 +132,11 @@ async def get_climate_data_timeseries_logic(
                 val = row[column]
                 if val is not None:
                     result["data"].append({
-                    "date": row["date_id"].strftime("%Y-%m-%d"),
-                    "year": row["date_id"].year,
-                    "month": row["date_id"].month,
-                    "values": {variable: val}
-                })
+                        "date": row["date_id"].strftime("%Y-%m-%d"),
+                        "year": row["date_id"].year,
+                        "month": row["date_id"].month,
+                        "values": {variable: val}
+                    })
             return result
 
     except Exception as e:

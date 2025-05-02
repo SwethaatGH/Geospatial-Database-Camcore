@@ -23,7 +23,7 @@ class DataSource(str, Enum):
     CHIRPS = "chirps"
     ET = "et"
     ELEVATION = "elev"
-    SOILGRIDS = "sg"
+    SOILGRIDS = "soil"
     TERRACLIM = "tc"
     NASAPOWER = "np"
     ERA5 = "era5"
@@ -55,7 +55,7 @@ DATA_SOURCE_TABLES = {
     DataSource.ELEVATION: "elev_data",
     DataSource.TERRACLIM: "terraclim_data",
     DataSource.NASAPOWER: "np_data",
-    DataSource.SOILGRIDS: "sg_data",
+    DataSource.SOILGRIDS: "soil_data",
     DataSource.ERA5: "era5_data"
 }
 
@@ -64,7 +64,7 @@ AVAILABLE_VARIABLES = {
     DataSource.SPEI: ["spei"],
     DataSource.CHIRPS: ["chirps"],
     DataSource.ET: ["et"],
-    DataSource.ELEVATION: ["elev"], 
+    DataSource.ELEVATION: ["aspect", "elev", "flowdir", "hillshade", "roughness", "tpi", "tri", "slope"], 
     DataSource.SOILGRIDS: ["bdod", "cec", "cfvo", "clay", "nitrogen", "ocd", "ocs", "phh2o", "sand", "silt", "soc", "wv0010", "wv0030", "wv1500"],
     DataSource.TERRACLIM: ["aet", "def", "pdsi", "pet", "ppt", "q", "soil", "srad", "tmin", "vap", "vpd", "ws"],
     DataSource.NASAPOWER: ["airmass", "allsky_kt", "allsky_nkt", "allsky_sfc_lw_dwn", "allsky_sfc_lw_up", "allsky_sfc_par_diff", 
@@ -85,6 +85,8 @@ DATASOURCES_WITH_VARIABLES = [
     DataSource.TERRACLIM,
     DataSource.NASAPOWER,
     DataSource.ERA5,
+    DataSource.ELEVATION,
+    DataSource.SOILGRIDS,
 ]
 
 STATIC_DATA_SOURCES = [
@@ -371,55 +373,24 @@ async def get_climate_data_timeseries_bbox_sampled(
             else:
                 # Single date mode or static data
                 if data_source in STATIC_DATA_SOURCES:
-                    # For static data sources (elevation, soilgrids)
-                    if data_source == DataSource.SOILGRIDS:
-                        variables = AVAILABLE_VARIABLES.get(data_source, [])
-                        query = text(f"""
-                            SELECT 
-                                var_name,
-                                ST_Value(rast, {point_wkt}) AS point_value
-                            FROM 
-                                {table_name}
-                            WHERE 
-                                var_name IN ({", ".join([f"'{var}'" for var in variables])})
-                                AND ST_Value(rast, {point_wkt}) IS NOT NULL
-                        """)
-                        
-                        result_data = await db.execute(query)
-                        rows = result_data.mappings().all()
-                        
-                        for row in rows:
-                            if row["point_value"] is not None:
-                                # Handle NaN values
-                                point_value = row["point_value"]
-                                if isinstance(point_value, float) and (math.isnan(point_value) or math.isinf(point_value)):
-                                    point_value = None
-                                    
-                                if point_value is not None:
-                                    point_data["values"][row["var_name"]] = point_value
-                    else:
-                        # For elevation
-                        query = text(f"""
-                            SELECT 
-                                ST_Value(rast, {point_wkt}) AS point_value
-                            FROM 
-                                {table_name}
-                            WHERE 
-                                ST_Value(rast, {point_wkt}) IS NOT NULL
-                            LIMIT 1
-                        """)
-                        
-                        result_data = await db.execute(query)
-                        row = result_data.mappings().first()
-                        
-                        if row and row["point_value"] is not None:
-                            # Handle NaN values
-                            point_value = row["point_value"]
-                            if isinstance(point_value, float) and (math.isnan(point_value) or math.isinf(point_value)):
-                                point_value = None
-                                
-                            if point_value is not None:
-                                point_data["values"][variable] = point_value
+                    variables = [variable] if variable else AVAILABLE_VARIABLES.get(data_source, [])
+                    if not variables:
+                        continue
+
+                    query = text(f"""
+                        SELECT var_name, ST_Value(rast, {point_wkt}) AS point_value
+                        FROM {table_name}
+                        WHERE var_name IN ({", ".join([f"'{v}'" for v in variables])})
+                        AND ST_Value(rast, {point_wkt}) IS NOT NULL
+                    """)
+                    rows = (await db.execute(query)).mappings().all()
+
+                    for row in rows:
+                        val = row["point_value"]
+                        if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
+                            val = None
+                        if val is not None:
+                            point_data["values"][row["var_name"]] = val
                
                 # Only add point if it has data
                 if point_data["values"]:
