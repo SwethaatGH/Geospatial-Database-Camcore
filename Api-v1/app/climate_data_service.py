@@ -1,4 +1,3 @@
-# climate_data_service.py
 from datetime import datetime
 from typing import Optional
 from sqlalchemy import text
@@ -30,7 +29,7 @@ async def get_climate_data_timeseries_logic(
         "data_source": data_source.value,
         "location": {"lat": lat, "lon": lon},
         "cadence": DATA_SOURCE_CADENCE.get(data_source, Cadence.MONTHLY).value,
-        "values": []
+        "data": []
     }
 
     if data_source not in STATIC_DATA_SOURCES and (start_date is None or end_date is None):
@@ -65,7 +64,7 @@ async def get_climate_data_timeseries_logic(
                     ) sub
                 """)
                 row = (await db.execute(query)).mappings().first()
-                result["values"] = [{"value": row[var], "variable": var} for var in variables if row[var] is not None]
+                result["data"] = [{"variable": var, "value": row[var]} for var in variables if row[var] is not None]
             else:
                 query = text(f"""
                     SELECT ST_Value(rast, {point_wkt}) AS value
@@ -75,7 +74,7 @@ async def get_climate_data_timeseries_logic(
                 """)
                 row = (await db.execute(query)).mappings().first()
                 if row and row["value"] is not None:
-                    result["values"] = [{"value": row["value"]}]
+                    result["data"] = [{"value": row["value"]}]
             return result
 
         elif data_source in DATASOURCES_WITH_VARIABLES:
@@ -103,7 +102,7 @@ async def get_climate_data_timeseries_logic(
                     "month": row["date_id"].month,
                     "values": {k: v for k, v in row.items() if k != "date_id" and v is not None}
                 }
-                result["values"].append(item)
+                result["data"].append(item)
             return result
 
         else:
@@ -119,12 +118,12 @@ async def get_climate_data_timeseries_logic(
             for row in rows:
                 val = row[column]
                 if val is not None:
-                    result["values"].append({
-                        "date": row["date_id"].strftime("%Y-%m-%d"),
-                        "year": row["date_id"].year,
-                        "month": row["date_id"].month,
-                        "value": val
-                    })
+                    result["data"].append({
+                    "date": row["date_id"].strftime("%Y-%m-%d"),
+                    "year": row["date_id"].year,
+                    "month": row["date_id"].month,
+                    "values": {variable: val}
+                })
             return result
 
     except Exception as e:
