@@ -180,7 +180,7 @@
                         <option value="chirps">CHIRPS</option>
                         <option value="et">ET</option>
                         <option value="elev">Elevation</option>
-                        <option value="sg">SoilGrids</option>
+                        <option value="soil">SoilGrids</option>
                         <option value="tc">TerraClim</option>
                         <option value="np">NASA POWER</option>
                     </select>
@@ -211,7 +211,7 @@
                         <option value="chirps">CHIRPS</option>
                         <option value="et">ET</option>
                         <option value="elev">Elevation</option>
-                        <option value="sg">SoilGrids</option>
+                        <option value="soil">SoilGrids</option>
                         <option value="tc">TerraClim</option>
                         <option value="np">NASA POWER</option>
                     </select>
@@ -342,7 +342,7 @@
                 addOption(variableSelect, 'flowdir', 'Flow Direction');
                 addOption(variableSelect, 'hillshade', 'Hillshade');
                 dateControls.style.display = 'none';
-            } else if (dataSource === 'sg') {
+            } else if (dataSource === 'soil') {
                 addOption(variableSelect, 'bdod', 'Bulk Density');
                 addOption(variableSelect, 'cec', 'Cation Exchange Capacity');
                 addOption(variableSelect, 'cfvo', 'Coarse Fragments Volumetric');
@@ -515,7 +515,7 @@
             const variable = document.getElementById('variable-point').value;
             // Build API URL base
             let apiUrl = '';
-            if (dataSource === 'elev' || dataSource === 'sg') {
+            if (dataSource === 'elev' || dataSource === 'soil') {
                 // For static data sources
                 apiUrl = `/climate-data-timeseries/?lat=${selectedPoint.lat}&lon=${selectedPoint.lon}&data_source=${dataSource}&variable=${variable}`;
             } else {
@@ -543,7 +543,7 @@
                 const data = await response.json();
                 console.log(data); // Log the data for debugging
                 // Process and display the data
-                if (dataSource === 'elev' || dataSource === 'sg') {
+                if (dataSource === 'elev' || dataSource === 'soil') {
                     displayStaticData(data, dataSource);
                 } else {
                     displayTimeSeriesData(data);
@@ -570,11 +570,11 @@
             // Build API URL
             let apiUrl = '';
             // For static data sources (elevation, soilgrids)
-            if (dataSource === 'elev' || dataSource === 'sg') {
+            if (dataSource === 'elev' || dataSource === 'soil') {
                 // Static data sources don't need date parameters
                 apiUrl = `/climate-data-timeseries-bbox-sampled/?min_lat=${bboxCoordinates.min_lat}&min_lon=${bboxCoordinates.min_lon}&max_lat=${bboxCoordinates.max_lat}&max_lon=${bboxCoordinates.max_lon}&data_source=${dataSource}&variable=${variable}`;
                 // Add variable if it's SoilGrids (has multiple variables)
-                if (dataSource === 'sg') {
+                if (dataSource === 'soil') {
                     apiUrl += `&variable=${variable}`;
                 }
             } else {
@@ -911,7 +911,7 @@
     const isMulti = Array.isArray(data.data) && data.data.length > 1;
     const isSingle = Array.isArray(data.data) && data.data.length === 1;
 
-    if ((dataSource === 'sg' || dataSource === 'elev') && isMulti) {
+    if ((dataSource === 'soil' || dataSource === 'elev') && isMulti) {
         // Multiple variables returned (e.g., all of soilgrids or elevation derivatives)
         const properties = data.data.map(d => d.variable);
         const datasets = data.data.map(d => ({
@@ -943,7 +943,7 @@
                 plugins: {
                     title: {
                         display: true,
-                        text: `${dataSource === 'sg' ? 'Soil' : 'Elevation'} Variables at Lat: ${data.location.lat}, Lon: ${data.location.lon}`
+                        text: `${dataSource === 'soil' ? 'Soil' : 'Elevation'} Variables at Lat: ${data.location.lat}, Lon: ${data.location.lon}`
                     },
                     tooltip: {
                         callbacks: {
@@ -1023,7 +1023,7 @@
             const variable = document.getElementById('variable-point').value;
             let apiUrl = ''; // <-- keep this
 
-            if (dataSource === 'elev' || dataSource === 'sg') {
+            if (dataSource === 'elev' || dataSource === 'soil') {
                 apiUrl = `/climate-data-timeseries/?lat=${selectedPoint.lat}&lon=${selectedPoint.lon}&data_source=${dataSource}&variable=${variable}`;
             } else {
                 const startDate = document.getElementById('start-date').value;
@@ -1046,7 +1046,7 @@
                 }
                 const data = await response.json();
                 console.log(data);
-                if (dataSource === 'elev' || dataSource === 'sg') {
+                if (dataSource === 'elev' || dataSource === 'soil') {
                     displayStaticData(data, dataSource);
                 } else {
                     displayTimeSeriesData(data);
