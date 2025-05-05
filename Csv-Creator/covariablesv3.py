@@ -349,6 +349,7 @@ def extract_monthly_covariates(df: pd.DataFrame, source: str, variables: list, p
             tmp_df['Season'] = tmp_df['Date'].dt.month.apply(lambda m: get_season_monthly(m))
             tmp_df = tmp_df[tmp_df['Value'].notna()]
 
+            # --- Seasonal stats ---
             group = tmp_df.groupby(['Year', 'Season'])['Value']
             summary = {
                 'Min': group.min(),
@@ -372,7 +373,19 @@ def extract_monthly_covariates(df: pd.DataFrame, source: str, variables: list, p
                     result[key] = row_cov[col]
                 all_results.append(result)
 
+            # --- Yearly mean for TC only ---
+            if source == 'tc':
+                annual_group = tmp_df.groupby('Year')['Value'].mean().reset_index()
+                for _, ann_row in annual_group.iterrows():
+                    all_results.append({
+                        'latitude': lat,
+                        'longitude': lon,
+                        'year': int(ann_row['Year']),
+                        f"{prefix}_{var}_Mean_year": ann_row['Value']
+                    })
+
     return pd.DataFrame(all_results)
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -388,8 +401,8 @@ def main():
         return
     
         # --- Extract static elev_ and soil_ columns ---
-    static_cols = ['latitude', 'longitude', 'year'] + [col for col in df.columns if col.startswith("elev_") or col.startswith("soil_")]
-    static_df = df[static_cols].drop_duplicates(subset=["latitude", "longitude", "year"])
+    static_cols = ['latitude', 'longitude'] + [col for col in df.columns if col.startswith("elev_") or col.startswith("soil_")]
+    static_df = df[static_cols].drop_duplicates(subset=["latitude", "longitude"])
 
     chirps_df = extract_chirps_covariates_from_daily_columns(df)
     et_df = extract_et_covariates(df)
@@ -409,13 +422,17 @@ def main():
     era5_rest_df = extract_era5_covariates(df)
     era5_quartile = extract_era5_temp_precip_covariates(df)
 
-    dfs = [static_df, chirps_df, et_df, wc_df, spei_df, tc_df, np_df, era5_p_df, era5_rest_df, era5_quartile]
-    for i, d in enumerate(dfs):
+    dynamic_dfs = [chirps_df, et_df, wc_df, spei_df, tc_df, np_df, era5_p_df, era5_rest_df, era5_quartile]
+    for i, d in enumerate(dynamic_dfs):
         if d is not None and not d.empty:
-            dfs[i] = d.groupby(['latitude', 'longitude', 'year']).first().reset_index()
+            dynamic_dfs[i] = d.groupby(['latitude', 'longitude', 'year']).first().reset_index()
 
     from functools import reduce
-    merged_df = reduce(lambda left, right: pd.merge(left, right, on=['latitude', 'longitude', 'year'], how='outer'), [d for d in dfs if not d.empty])
+    merged_df = reduce(lambda left, right: pd.merge(left, right, on=['latitude', 'longitude', 'year'], how='outer'), [d for d in dynamic_dfs if not d.empty])
+
+    # Merge static columns after
+    if not static_df.empty and not merged_df.empty:
+        merged_df = pd.merge(merged_df, static_df, on=['latitude', 'longitude'], how='left')
 
     if merged_df is not None and not merged_df.empty:
         for col in merged_df.columns:
