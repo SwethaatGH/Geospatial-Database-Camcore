@@ -4,6 +4,7 @@ import time, json, argparse, hashlib, os
 import asyncio
 import sys
 from tqdm import tqdm
+from dateutil.parser import parse as try_parse_date
 
 # Add virtual environment site-packages to path
 venv_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Api-v1", "venv"))
@@ -24,6 +25,9 @@ from app.main import DataSource
 from app.climate_data_service import get_climate_data_timeseries_logic
 
 def convert_date_format(date_str):
+    if pd.isna(date_str):  # handle NaN explicitly
+        return None
+    date_str = str(date_str).strip()  # ensure it's a clean string
     formats = ['%m/%d/%Y', '%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%Y/%m/%d']
     for fmt in formats:
         try:
@@ -31,7 +35,29 @@ def convert_date_format(date_str):
             return date_obj.strftime('%Y-%m-%d')
         except ValueError:
             continue
-    return date_str
+    return date_str  # fallback: return as-is
+
+
+def detect_date_columns(df):
+    """Detect two datetime columns from the DataFrame."""
+    date_cols = []
+    for col in df.columns:
+        try:
+            # Try first non-null value
+            sample_val = df[col].dropna().iloc[0]
+            if isinstance(sample_val, (int, float)) and sample_val < 10000:
+                continue  # Likely not a date (e.g., lat/lon)
+            parsed = try_parse_date(str(sample_val), fuzzy=False)
+            date_cols.append(col)
+        except (ValueError, IndexError, TypeError):
+            continue
+    if len(date_cols) >= 2:
+        return date_cols[:2]
+    elif len(date_cols) == 1:
+        return date_cols[0], date_cols[0]
+    else:
+        return None, None
+
 
 STATIC_SOURCES = {'elev', 'soil'}
 
@@ -98,11 +124,18 @@ async def process_csv_file(input_csv_path, output_csv_path, default_start_date=N
 
     all_rows_updates = []
 
+    # Detect date columns once
+    start_col, end_col = detect_date_columns(df)
+
     for index, row in tqdm(df.iterrows(), total=len(df), desc="Processing rows"):
         lat = row['latitude']
         lon = row['longitude']
-        start_date = convert_date_format(row.get('data_final', default_start_date))
-        end_date = convert_date_format(row.get('date_final', default_end_date))
+
+        start_date_raw = row.get(start_col) if start_col else default_start_date
+        end_date_raw = row.get(end_col) if end_col else default_end_date
+
+        start_date = convert_date_format(start_date_raw)
+        end_date = convert_date_format(end_date_raw)
 
         row_updates = {}
 
