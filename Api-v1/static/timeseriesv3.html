@@ -178,6 +178,7 @@
                         <option value="wc">WorldClim</option>
                         <option value="spei">SPEI</option>
                         <option value="chirps">CHIRPS</option>
+                        <option value="era5">Era5 Land</option>
                         <option value="et">ET</option>
                         <option value="elev">Elevation</option>
                         <option value="soil">SoilGrids</option>
@@ -209,6 +210,7 @@
                         <option value="wc">WorldClim</option>
                         <option value="spei">SPEI</option>
                         <option value="chirps">CHIRPS</option>
+                        <option value="era5">Era5 Land</option>
                         <option value="et">ET</option>
                         <option value="elev">Elevation</option>
                         <option value="soil">SoilGrids</option>
@@ -422,6 +424,23 @@
                 addOption(variableSelect, 'toa_sw_dni', 'TOA SW DNI');
                 addOption(variableSelect, 'toa_sw_dwn', 'TOA SW Down');
                 addOption(variableSelect, 'ts_adj', 'Temperature Adjusted');
+                dateControls.style.display = 'block';
+            } else if (dataSource === 'era5') {
+                addOption(variableSelect, 'evaptrans', 'Evapotranspiration');
+                addOption(variableSelect, 'latheat', 'Latent Heat');
+                addOption(variableSelect, 'netsolrad', 'Net Solar Radiation');
+                addOption(variableSelect, 'press', 'Pressure');
+                addOption(variableSelect, 'sktemp', 'Skin Temperature');
+                addOption(variableSelect, 'sotemp1', 'Soil Temp Layer 1');
+                addOption(variableSelect, 'sotemp2', 'Soil Temp Layer 2');
+                addOption(variableSelect, 'sotemp3', 'Soil Temp Layer 3');
+                addOption(variableSelect, 'temp', 'Temperature');
+                addOption(variableSelect, 'totprec', 'Total Precipitation');
+                addOption(variableSelect, 'uwind', 'U-Wind');
+                addOption(variableSelect, 'vwind', 'V-Wind');
+                addOption(variableSelect, 'volsowat1', 'Soil Water Vol Layer 1');
+                addOption(variableSelect, 'volsowat12', 'Soil Water Vol Layer 2');
+                addOption(variableSelect, 'volsowat13', 'Soil Water Vol Layer 3');
                 dateControls.style.display = 'block';
             }
         }
@@ -1196,9 +1215,9 @@
             return labels[variable] || variable;
         }
         function getUnitLabel(variable, dataSource) {
-            if (variable === 'prec' || variable === 'chirps' || variable === 'et' || variable === 'ppt' || variable === 'aet' || variable === 'pet' || variable === 'q') {
+            if (variable === 'prec' || variable === 'chirps' || variable === 'et' || variable === 'ppt' || variable === 'aet' || variable === 'pet' || variable === 'q' || variable === 'totprec') {
                 return 'mm';
-            } else if (variable === 'tmax' || variable === 'tmin') {
+            } else if (variable === 'tmax' || variable === 'tmin' || variable === 'temp' || variable === 'sktemp' || variable === 'sotemp1' || variable === 'sotemp2' || variable === 'sotemp3') {
                 return '°C';
             } else if (variable === 'spei' || variable === 'pdsi') {
                 return 'index';
@@ -1238,11 +1257,23 @@
                 return 'kPa';
             } else if (variable === 'ws') {
                 return 'm/s';
+            } else if (variable === 'latheat') {
+                return 'J/m²';
+            } else if (variable === 'netsolrad') {
+                return 'W/m²';
+            } else if (variable === 'press') {
+                return 'Pa';
+            } else if (variable === 'uwind' || variable === 'vwind') {
+                return 'm/s';
+            } else if (variable === 'volsowat1' || variable === 'volsowat12' || variable === 'volsowat13') {
+                return 'm³/m³';
             } else if (variable.includes('allsky') || variable.includes('clrsky') || variable.includes('toa')) {
                 return 'W/m²';
             }
+
             return '';
         }
+
         function getCadenceLabel(cadence) {
             const labels = {
                 'daily': 'Date',
