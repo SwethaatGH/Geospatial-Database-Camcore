@@ -386,6 +386,10 @@ def main():
     except Exception as e:
         print(f"Failed to load input CSV: {e}")
         return
+    
+        # --- Extract static elev_ and soil_ columns ---
+    static_cols = ['latitude', 'longitude', 'year'] + [col for col in df.columns if col.startswith("elev_") or col.startswith("soil_")]
+    static_df = df[static_cols].drop_duplicates(subset=["latitude", "longitude", "year"])
 
     chirps_df = extract_chirps_covariates_from_daily_columns(df)
     et_df = extract_et_covariates(df)
@@ -405,7 +409,7 @@ def main():
     era5_rest_df = extract_era5_covariates(df)
     era5_quartile = extract_era5_temp_precip_covariates(df)
 
-    dfs = [chirps_df, et_df, wc_df, spei_df, tc_df, np_df, era5_p_df, era5_rest_df, era5_quartile]
+    dfs = [static_df, chirps_df, et_df, wc_df, spei_df, tc_df, np_df, era5_p_df, era5_rest_df, era5_quartile]
     for i, d in enumerate(dfs):
         if d is not None and not d.empty:
             dfs[i] = d.groupby(['latitude', 'longitude', 'year']).first().reset_index()

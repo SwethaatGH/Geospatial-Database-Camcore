@@ -1,6 +1,7 @@
 ""# main.py (fully integrated version)
 import time
 import math
+import sys
 import os, shutil, subprocess, uuid, json
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -153,7 +154,7 @@ async def process_csv(
 
     try:
         subprocess.run([
-            "python", "../Csv-Creator/script.py",
+            sys.executable, "../Csv-Creator/script.py",
             "--input", str(file_path),
             "--output", str(raw_data_path),
             "--default-start-date", "2000-01-01",
@@ -163,7 +164,7 @@ async def process_csv(
 
         if option == "full":
             subprocess.run([
-                "python", "../Csv-Creator/covariablesv3.py",
+                sys.executable, "../Csv-Creator/covariablesv3.py",
                 "--input", str(raw_data_path),
                 "--output", str(covariates_path)
             ], check=True)
