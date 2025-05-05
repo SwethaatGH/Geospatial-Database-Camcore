@@ -3,6 +3,41 @@ import re
 from tqdm import tqdm
 import argparse
 from datetime import datetime
+import numpy as np
+
+def compute_biovars(prec, tmin, tmax):
+    temp = (np.array(tmin) + np.array(tmax)) / 2
+    prec = np.array(prec)
+
+    bio = np.empty(19)
+    bio[0] = temp.mean()                          # BIO1
+    bio[1] = temp.max() - temp.min()              # BIO2
+    bio[2] = np.std(temp, ddof=1) * 100           # BIO4
+    bio[3] = np.sum(prec)                         # BIO12
+    bio[4] = prec.max()                           # BIO13
+    bio[5] = prec.min()                           # BIO14
+    bio[6] = temp[prec.argmax()]                  # BIO8
+    bio[7] = temp[prec.argmin()]                  # BIO9
+    bio[8] = np.max(tmax)                         # BIO5
+    bio[9] = np.min(tmin)                         # BIO6
+    bio[10] = np.mean([tmin[month-1] for month in [11,12,1]])  # BIO11 (mean temp of coldest quarter)
+    bio[11] = np.mean([tmax[month-1] for month in [6,7,8]])    # BIO10 (mean temp of warmest quarter)
+
+    # Approximate quarters for precipitation seasonality
+    quarters = [sum(prec[i:i+3]) for i in range(0, 12, 3)]
+    wettest_q = np.argmax(quarters)
+    driest_q = np.argmin(quarters)
+    bio[12] = quarters[wettest_q]                # BIO16
+    bio[13] = quarters[driest_q]                 # BIO17
+
+    bio[14] = sum(prec > 100)                    # BIO18
+    bio[15] = sum(prec < 20)                     # BIO19
+
+    bio[16] = (np.mean(tmax) + np.mean(tmin)) / 2  # BIO3 approximation
+    bio[17] = np.mean(np.array(tmax) - np.array(tmin))  # Mean diurnal range
+    bio[18] = np.mean((tmax - temp) * (prec / 100))     # BIO7-ish, weighted daily range (not exact)
+
+    return bio
 
 def get_season_monthly(month):
     if month in [1, 2, 3]: return "Summer"
@@ -326,30 +361,37 @@ def extract_era5_temp_precip_covariates(df: pd.DataFrame) -> pd.DataFrame:
 
 def extract_monthly_covariates(df: pd.DataFrame, source: str, variables: list, prefix: str) -> pd.DataFrame:
     all_results = []
+    data_by_var = {}
 
+    # --- Collect all matching columns for each variable ---
     for var in variables:
         pattern = re.compile(rf"{source}_{var}_(\d{{4}})-(\d{{2}})")
         matching_columns = [col for col in df.columns if pattern.match(col)]
-        if not matching_columns:
+        if matching_columns:
+            data_by_var[var] = matching_columns
+        else:
             print(f"No columns found for {source}/{var}")
-            continue
 
-        date_range = [pd.to_datetime("{}-{}-01".format(*pattern.match(col).groups())) for col in matching_columns]
+    for idx, row in tqdm(df.iterrows(), total=len(df), desc=f"Processing {source.upper()} covariates"):
+        lat, lon = row['latitude'], row['longitude']
 
-        for idx, row in tqdm(df.iterrows(), total=len(df), desc=f"Processing {prefix} {var} covariates"):
-            lat = row['latitude']
-            lon = row['longitude']
-            values = row[matching_columns].values.tolist()
+        # --- For wc/biovar: load full tmax, tmin, prec if present ---
+        tmax_cols, tmin_cols, prec_cols = [], [], []
+        if source == 'wc':
+            tmax_cols = data_by_var.get('tmax', [])
+            tmin_cols = data_by_var.get('tmin', [])
+            prec_cols = data_by_var.get('prec', [])
 
-            tmp_df = pd.DataFrame({
-                'Date': date_range,
-                'Value': pd.to_numeric(values, errors='coerce')
-            })
+        # --- Seasonal stats for each variable ---
+        for var, matching_columns in data_by_var.items():
+            values = pd.to_numeric(row[matching_columns], errors='coerce')
+            regex = re.compile(r"(\d{4})-(\d{2})")
+            dates = [pd.to_datetime(f"{regex.search(col).group(0)}-01") for col in matching_columns]
+            tmp_df = pd.DataFrame({'Date': dates, 'Value': values})
             tmp_df['Year'] = tmp_df['Date'].dt.year
             tmp_df['Season'] = tmp_df['Date'].dt.month.apply(lambda m: get_season_monthly(m))
             tmp_df = tmp_df[tmp_df['Value'].notna()]
 
-            # --- Seasonal stats ---
             group = tmp_df.groupby(['Year', 'Season'])['Value']
             summary = {
                 'Min': group.min(),
@@ -357,7 +399,7 @@ def extract_monthly_covariates(df: pd.DataFrame, source: str, variables: list, p
                 'Std': group.std(),
                 'CV': group.std() / group.mean()
             }
-            if source == 'wc':
+            if source == 'wc' and var == 'prec':
                 summary['Sum'] = group.sum()
 
             summary_df = pd.concat(summary, axis=1).reset_index()
@@ -373,16 +415,54 @@ def extract_monthly_covariates(df: pd.DataFrame, source: str, variables: list, p
                     result[key] = row_cov[col]
                 all_results.append(result)
 
-            # --- Yearly mean for TC only ---
             if source == 'tc':
-                annual_group = tmp_df.groupby('Year')['Value'].mean().reset_index()
-                for _, ann_row in annual_group.iterrows():
+                ann_mean = tmp_df.groupby('Year')['Value'].mean().reset_index()
+                for _, row_ann in ann_mean.iterrows():
                     all_results.append({
                         'latitude': lat,
                         'longitude': lon,
-                        'year': int(ann_row['Year']),
-                        f"{prefix}_{var}_Mean_year": ann_row['Value']
+                        'year': int(row_ann['Year']),
+                        f"{prefix}_{var}_Mean_year": row_ann['Value']
                     })
+
+        # --- Biovars ---
+        if source == 'wc' and all([tmax_cols, tmin_cols, prec_cols]):
+            regex = re.compile(r"(\d{4})-(\d{2})")
+
+            # --- Extract all (year, month) and values for each variable ---
+            def extract_var_map(var_cols):
+                val_map = {}
+                for col in var_cols:
+                    match = regex.search(col)
+                    if match:
+                        y, m = int(match.group(1)), int(match.group(2))
+                        val_map.setdefault(y, {})[m] = pd.to_numeric(row.get(col), errors='coerce')
+                return val_map
+
+            tmax_map = extract_var_map(tmax_cols)
+            tmin_map = extract_var_map(tmin_cols)
+            prec_map = extract_var_map(prec_cols)
+
+            # --- Compute biovars per year ---
+            years = set(tmax_map.keys()) & set(tmin_map.keys()) & set(prec_map.keys())
+            for year in sorted(years):
+                try:
+                    tmax_vals = np.array([tmax_map[year].get(m, np.nan) for m in range(1, 13)])
+                    tmin_vals = np.array([tmin_map[year].get(m, np.nan) for m in range(1, 13)])
+                    prec_vals = np.array([prec_map[year].get(m, np.nan) for m in range(1, 13)])
+
+                    valid_mask = lambda arr: np.count_nonzero(~np.isnan(arr)) >= 10
+                    if all(valid_mask(arr) for arr in [tmax_vals, tmin_vals, prec_vals]):
+                        bio = compute_biovars(prec_vals, tmin_vals, tmax_vals)
+                        bio_result = {
+                            'latitude': lat,
+                            'longitude': lon,
+                            'year': year
+                        }
+                        bio_result.update({f"WC_bio{idx+1}": val for idx, val in enumerate(bio)})
+                        all_results.append(bio_result)
+                except Exception as e:
+                    print(f"[BIOVARS ERROR] lat={lat} lon={lon} year={year} — {e}")
 
     return pd.DataFrame(all_results)
 
