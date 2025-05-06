@@ -4,6 +4,8 @@ from tqdm import tqdm
 import argparse
 from datetime import datetime
 import numpy as np
+from scipy.stats import kurtosis, skew
+
 
 def compute_biovars(prec, tmin, tmax):
     temp = (np.array(tmin) + np.array(tmax)) / 2
@@ -135,9 +137,16 @@ def calculate_precip_covariates(date_range, coordinates, precip_values, prefix="
 
     # Seasonal aggregation
     seasonal_stats = df.groupby(["Year", "Season"])["Precipitation"].agg(
-        Sum="sum", Mean="mean", Median="median", Std_Dev="std"
+        Sum="sum",
+        Mean="mean",
+        Median="median",
+        Std_Dev="std",
+        CV=lambda x: x.std() / x.mean() if x.mean() != 0 else np.nan,
+        Skew=lambda x: skew(x, nan_policy='omit'),
+        Kurtosis=lambda x: kurtosis(x, nan_policy='omit'),
+        Q5=lambda x: x.quantile(0.05),
+        Q95=lambda x: x.quantile(0.95)
     ).reset_index()
-    seasonal_stats["CV"] = seasonal_stats["Std_Dev"] / seasonal_stats["Mean"]
 
     # Additional seasonal indicators
     days_at_0mm = df[df["Precipitation"] == 0].groupby(["Year", "Season"]).size().reset_index(name="DAt_0")
@@ -202,25 +211,30 @@ def extract_era5_covariates(df: pd.DataFrame) -> pd.DataFrame:
 
             grouped = tmp_df.groupby(['Year', 'Season'])['Value']
             summary = grouped.agg(
-                min='min',
-                max='max',
-                std='std',
-                mean='mean'
-            ).reset_index()
-            summary['CV'] = summary['std'] / summary['mean']
+            mean='mean',
+            min='min',
+            max='max',
+            std='std',
+            skew='skew',
+            kurtosis=lambda x: kurtosis(x, nan_policy='omit'),  # <-- Fix here
+            p5=lambda x: x.quantile(0.05),
+            p95=lambda x: x.quantile(0.95),
+            cv=lambda x: x.std() / x.mean() if x.mean() != 0 else np.nan
+        ).reset_index()
 
-            for _, row_cov in summary.iterrows():
-                result = {
-                    'latitude': lat,
-                    'longitude': lon,
-                    'year': int(row_cov['Year'])
-                }
-                season_code = row_cov['Season'][:2]
-                result[f"ERA5_{var}_min_{season_code}"] = row_cov['min']
-                result[f"ERA5_{var}_max_{season_code}"] = row_cov['max']
-                result[f"ERA5_{var}_std_{season_code}"] = row_cov['std']
-                result[f"ERA5_{var}_CV_{season_code}"] = row_cov['CV']
-                all_results.append(result)
+        for _, row_cov in summary.iterrows():
+            result = {
+                'latitude': lat,
+                'longitude': lon,
+                'year': int(row_cov['Year'])
+            }
+            season_code = row_cov['Season'][:2]
+            for stat_key, label in zip(
+                ['mean', 'min', 'max', 'std', 'cv', 'skew', 'kurtosis', 'p5', 'p95'],
+                ['mean', 'min', 'max', 'std', 'CV', 'Skew', 'Kurtosis', 'Q5', 'Q95']
+            ):
+                result[f"ERA5_{var}_{label}_{season_code}"] = row_cov[stat_key]
+            all_results.append(result)
 
     return pd.DataFrame(all_results)
 
@@ -394,10 +408,15 @@ def extract_monthly_covariates(df: pd.DataFrame, source: str, variables: list, p
 
             group = tmp_df.groupby(['Year', 'Season'])['Value']
             summary = {
+                'Mean': group.mean(),
                 'Min': group.min(),
                 'Max': group.max(),
                 'Std': group.std(),
-                'CV': group.std() / group.mean()
+                'CV': group.std() / group.mean(),
+                'Skew': group.apply(lambda x: x.skew()),
+                'Kurtosis': group.apply(lambda x: x.kurtosis()),
+                'Q5': group.apply(lambda x: x.quantile(0.05)),
+                'Q95': group.apply(lambda x: x.quantile(0.95))
             }
             if source == 'wc' and var == 'prec':
                 summary['Sum'] = group.sum()
