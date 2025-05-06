@@ -184,6 +184,7 @@
                         <option value="soil">SoilGrids</option>
                         <option value="tc">TerraClim</option>
                         <option value="np">NASA POWER</option>
+                        <option value="bio">Bioclim</option>
                     </select>
                     <label for="variable-point">Variable:</label>
                     <select id="variable-point">
@@ -216,6 +217,7 @@
                         <option value="soil">SoilGrids</option>
                         <option value="tc">TerraClim</option>
                         <option value="np">NASA POWER</option>
+                        <option value="bio">Bioclim</option>
                     </select>
                     <label for="variable-bbox">Variable:</label>
                     <select id="variable-bbox">
@@ -344,7 +346,34 @@
                 addOption(variableSelect, 'flowdir', 'Flow Direction');
                 addOption(variableSelect, 'hillshade', 'Hillshade');
                 dateControls.style.display = 'none';
-            } else if (dataSource === 'soil') {
+
+            } 
+            else if (dataSource === 'bio') {
+                addOption(variableSelect, 'bio1', 'Annual Mean Temperature (BIO1)');
+                addOption(variableSelect, 'bio2', 'Mean Diurnal Range (BIO2)');
+                addOption(variableSelect, 'bio3', 'Isothermality (BIO3)');
+                addOption(variableSelect, 'bio4', 'Temperature Seasonality (BIO4)');
+                addOption(variableSelect, 'bio5', 'Max Temperature of Warmest Month (BIO5)');
+                addOption(variableSelect, 'bio6', 'Min Temperature of Coldest Month (BIO6)');
+                addOption(variableSelect, 'bio7', 'Temperature Annual Range (BIO7)');
+                addOption(variableSelect, 'bio8', 'Mean Temp of Wettest Quarter (BIO8)');
+                addOption(variableSelect, 'bio9', 'Mean Temp of Driest Quarter (BIO9)');
+                addOption(variableSelect, 'bio10', 'Mean Temp of Warmest Quarter (BIO10)');
+                addOption(variableSelect, 'bio11', 'Mean Temp of Coldest Quarter (BIO11)');
+                addOption(variableSelect, 'bio12', 'Annual Precipitation (BIO12)');
+                addOption(variableSelect, 'bio13', 'Precipitation of Wettest Month (BIO13)');
+                addOption(variableSelect, 'bio14', 'Precipitation of Driest Month (BIO14)');
+                addOption(variableSelect, 'bio15', 'Precipitation Seasonality (BIO15)');
+                addOption(variableSelect, 'bio16', 'Precipitation of Wettest Quarter (BIO16)');
+                addOption(variableSelect, 'bio17', 'Precipitation of Driest Quarter (BIO17)');
+                addOption(variableSelect, 'bio18', 'Precipitation of Warmest Quarter (BIO18)');
+                addOption(variableSelect, 'bio19', 'Precipitation of Coldest Quarter (BIO19)');
+
+                // Hide date controls because Bioclim is static
+                dateControls.style.display = 'none';
+            }
+
+            else if (dataSource === 'soil') {
                 addOption(variableSelect, 'bdod', 'Bulk Density');
                 addOption(variableSelect, 'cec', 'Cation Exchange Capacity');
                 addOption(variableSelect, 'cfvo', 'Coarse Fragments Volumetric');
@@ -534,7 +563,7 @@
             const variable = document.getElementById('variable-point').value;
             // Build API URL base
             let apiUrl = '';
-            if (dataSource === 'elev' || dataSource === 'soil') {
+            if (dataSource === 'elev' || dataSource === 'soil' || dataSource === 'bio') {
                 // For static data sources
                 apiUrl = `/climate-data-timeseries/?lat=${selectedPoint.lat}&lon=${selectedPoint.lon}&data_source=${dataSource}&variable=${variable}`;
             } else {
@@ -562,7 +591,7 @@
                 const data = await response.json();
                 console.log(data); // Log the data for debugging
                 // Process and display the data
-                if (dataSource === 'elev' || dataSource === 'soil') {
+                if (dataSource === 'elev' || dataSource === 'soil' || dataSource === 'bio') {
                     displayStaticData(data, dataSource);
                 } else {
                     displayTimeSeriesData(data);
@@ -592,7 +621,7 @@
             const variable = document.getElementById('variable-bbox').value;
 
             let apiUrl = '';
-            const isTimeSeries = !(dataSource === 'elev' || dataSource === 'soil');
+            const isTimeSeries = !(dataSource === 'elev' || dataSource === 'soil' || dataSource === 'bio');
 
             if (isTimeSeries) {
                 const startDate = document.getElementById('bbox-start-date').value;
@@ -994,7 +1023,9 @@
             const isMulti = Array.isArray(data.data) && data.data.length > 1;
             const isSingle = Array.isArray(data.data) && data.data.length === 1;
 
-            if ((dataSource === 'soil' || dataSource === 'elev') && isMulti) {
+            
+
+            if ((dataSource === 'soil' || dataSource === 'elev' || dataSource === 'bio') && isMulti) {
                 // Multiple variables returned (e.g., all of soilgrids or elevation derivatives)
                 const properties = data.data.map(d => d.variable);
                 const datasets = data.data.map(d => ({
@@ -1266,6 +1297,19 @@
             const day = String(date.getDate()).padStart(2, '0');
             return `${year}-${month}-${day}`;
         }
+
+        function createBioVariableMap(dataArray) {
+                const map = {};
+                if (Array.isArray(dataArray)) {
+                    dataArray.forEach(item => {
+                        if (item.variable && item.value !== undefined) {
+                            map[item.variable] = item.value;
+                        }
+                    });
+                }
+                return map;
+            }
+
         // Initialize
         setDefaultDates();
         // Draw the initial bounding box on the map

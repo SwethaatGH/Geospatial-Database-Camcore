@@ -28,6 +28,8 @@ class DataSource(str, Enum):
     TERRACLIM = "tc"
     NASAPOWER = "np"
     ERA5 = "era5"
+    KOPPEN = "koppen"  # New addition for Köppen-Geiger
+    BIOCLIM = "bio"
 
 class Cadence(str, Enum):
     DAILY = "daily"
@@ -46,6 +48,9 @@ DATA_SOURCE_CADENCE = {
     DataSource.TERRACLIM: Cadence.MONTHLY,
     DataSource.NASAPOWER: Cadence.MONTHLY,
     DataSource.ERA5: Cadence.DAILY,
+    DataSource.KOPPEN: Cadence.STATIC,
+    DataSource.BIOCLIM: Cadence.STATIC,
+    
 }
 
 DATA_SOURCE_TABLES = {
@@ -57,7 +62,9 @@ DATA_SOURCE_TABLES = {
     DataSource.TERRACLIM: "terraclim_data",
     DataSource.NASAPOWER: "np_data",
     DataSource.SOILGRIDS: "soil_data",
-    DataSource.ERA5: "era5_data"
+    DataSource.ERA5: "era5_data",
+    DataSource.KOPPEN: "koppen_data",  # Add the table we created
+    DataSource.BIOCLIM: "bio_data",
 }
 
 AVAILABLE_VARIABLES = {
@@ -67,7 +74,7 @@ AVAILABLE_VARIABLES = {
     DataSource.ET: ["et"],
     DataSource.ELEVATION: ["aspect", "elev", "flowdir", "hillshade", "roughness", "tpi", "tri", "slope"], 
     DataSource.SOILGRIDS: ["bdod", "cec", "cfvo", "clay", "nitrogen", "ocd", "ocs", "phh2o", "sand", "silt", "soc", "wv0010", "wv0030", "wv1500"],
-    DataSource.TERRACLIM: ["aet", "def", "pdsi", "pet", "ppt", "q", "soil", "srad", "tmin", "vap", "vpd", "ws"],
+    DataSource.TERRACLIM: ["aet", "def", "pdsi", "pet", "ppt", "q", "soil", "srad", "tmin", "tmax", "vap", "vpd", "ws"],
     DataSource.NASAPOWER: ["airmass", "allsky_kt", "allsky_nkt", "allsky_sfc_lw_dwn", "allsky_sfc_lw_up", "allsky_sfc_par_diff", 
                          "allsky_sfc_par_dirh", "allsky_sfc_par_tot", "allsky_sfc_sw_diff", "allsky_sfc_sw_dirh", "allsky_sfc_sw_dni", 
                          "allsky_sfc_sw_dwn", "allsky_sfc_sw_up", "allsky_sfc_uv_index", "allsky_sfc_uva", "allsky_sfc_uvb", 
@@ -78,7 +85,13 @@ AVAILABLE_VARIABLES = {
                          "original_allsky_sfc_sw_diff", "original_allsky_sfc_sw_dirh", "psh", "pw", "srf_alb_adj", "toa_sw_dni", 
                          "toa_sw_dwn", "ts_adj"],
     DataSource.ERA5: ["evaptrans", "latheat", "netsolrad", "press", "sktemp", "sotemp1", "sotemp2", "sotemp3", "temp", 
-                     "totprec", "uwind", "vwind", "volsowat1", "volsowat12", "volsowat13"]
+                     "totprec", "uwind", "vwind", "volsowat1", "volsowat12", "volsowat13"],
+    DataSource.BIOCLIM: [
+        "bio1", "bio2", "bio3", "bio4", "bio5",
+        "bio6", "bio7", "bio8", "bio9", "bio10",
+        "bio11", "bio12", "bio13", "bio14", "bio15",
+        "bio16", "bio17", "bio18", "bio19"
+    ],
 }
 
 DATASOURCES_WITH_VARIABLES = [
@@ -88,11 +101,14 @@ DATASOURCES_WITH_VARIABLES = [
     DataSource.ERA5,
     DataSource.ELEVATION,
     DataSource.SOILGRIDS,
+    DataSource.BIOCLIM
 ]
 
 STATIC_DATA_SOURCES = [
     DataSource.ELEVATION,
     DataSource.SOILGRIDS,
+    DataSource.KOPPEN ,
+    DataSource.BIOCLIM
 ]
 
 from app.climate_data_service import get_climate_data_timeseries_logic, table_exists
@@ -423,7 +439,6 @@ async def get_climate_data_timeseries_bbox_sampled(
 # Mount the static files directory
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Add an endpoint to serve the HTML
 @app.get("/ui/", response_class=HTMLResponse)
 async def get_ui():
     with open("static/timeseriesv3.html", "r") as f:
@@ -749,30 +764,8 @@ async def get_climate_data_grid_heatmap(
         "max_precip": max_precip
     }
     
-# Add an endpoint to serve the HTML
-@app.get("/ui/kepler", response_class=HTMLResponse)
-async def get_ui():
-    with open("static/timeseriesv4.html", "r") as f:
-        return f.read()    
- 
-@app.get("/ui/heat", response_class=HTMLResponse)
-async def get_ui():
-    with open("static/heat.html", "r") as f:
-        return f.read()    
-       
 @app.get("/CSVGenerator", response_class=HTMLResponse)
 async def get_csv_generator():
     with open("static/csv_generator.html", "r") as f:
         return f.read()
-    
-# Add an endpoint to serve the HTML
-@app.get("/ui/chirps", response_class=HTMLResponse)
-async def get_ui():
-    with open("static/chirpsvizz.html", "r") as f:
-        return f.read()    
-    
-@app.get("/ui/nasapower", response_class=HTMLResponse)
-async def get_ui():
-    with open("static/nasapowervizz.html", "r") as f:
-        return f.read()    
     
