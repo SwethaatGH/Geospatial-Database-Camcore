@@ -59,7 +59,7 @@ def detect_date_columns(df):
         return None, None
 
 
-STATIC_SOURCES = {'elev', 'soil'}
+STATIC_SOURCES = {'elev', 'soil', 'bio'}
 
 DATA_SOURCES = {
     "wc": ["prec", "tmax", "tmin"],
@@ -79,7 +79,11 @@ DATA_SOURCES = {
            "midday_insol", "original_allsky_sfc_sw_diff", "original_allsky_sfc_sw_dirh", "psh", "pw",
            "srf_alb_adj", "toa_sw_dni", "toa_sw_dwn", "ts_adj"],
     "era5": ["evaptrans", "latheat", "netsolrad", "press", "sktemp", "sotemp1", "sotemp2", "sotemp3", "temp",
-             "totprec", "uwind", "vwind", "volsowat1", "volsowat12", "volsowat13"]
+             "totprec", "uwind", "vwind", "volsowat1", "volsowat12", "volsowat13"],
+    "bio": ["bio1", "bio2", "bio3", "bio4", "bio5",
+        "bio6", "bio7", "bio8", "bio9", "bio10",
+        "bio11", "bio12", "bio13", "bio14", "bio15",
+        "bio16", "bio17", "bio18", "bio19"]
 }
 
 def save_cache(cache, cache_file_path):
@@ -158,7 +162,7 @@ async def process_csv_file(input_csv_path, output_csv_path, default_start_date=N
                             new_columns.add(key)
 
         all_rows_updates.append(row_updates)
-        time.sleep(0.05)
+        # time.sleep(0.05)
 
     # Add new columns to avoid fragmentation
     for col in sorted(new_columns):

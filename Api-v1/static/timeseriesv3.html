@@ -1023,8 +1023,6 @@
             const isMulti = Array.isArray(data.data) && data.data.length > 1;
             const isSingle = Array.isArray(data.data) && data.data.length === 1;
 
-            
-
             if ((dataSource === 'soil' || dataSource === 'elev' || dataSource === 'bio') && isMulti) {
                 // Multiple variables returned (e.g., all of soilgrids or elevation derivatives)
                 const properties = data.data.map(d => d.variable);
