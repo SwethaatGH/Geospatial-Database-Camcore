@@ -329,7 +329,7 @@
                 addOption(variableSelect, 'spei', 'SPEI');
                 dateControls.style.display = 'block';
             } else if (dataSource === 'chirps') {
-                addOption(variableSelect, 'prec', 'Precipitation');
+                addOption(variableSelect, 'chirps', 'Precipitation');
                 dateControls.style.display = 'block';
             } else if (dataSource === 'et') {
                 addOption(variableSelect, 'et', 'Evapotranspiration');
@@ -575,67 +575,131 @@
             }
         });
 
-        // Updated fetch bounding box data button click handler
+
+        let isFetching = false;
+
         document.getElementById('fetch-bbox-data').addEventListener('click', async function () {
-            // Check if a bounding box is selected
+            if (isFetching) return;
+            isFetching = true;
+
             if (!bboxCoordinates) {
                 showError('Please draw a bounding box on the map first.');
+                isFetching = false;
                 return;
             }
-            // Get form values
+
             const dataSource = document.getElementById('data-source-bbox').value;
             const variable = document.getElementById('variable-bbox').value;
-            // const isTimeSeries = document.getElementById('bbox-time-series-toggle').checked;
-            // Build API URL
-            let apiUrl = '';
-            // For static data sources (elevation, soilgrids)
-            if (dataSource === 'elev' || dataSource === 'soil') {
-                // Static data sources don't need date parameters
-                apiUrl = `/climate-data-timeseries-bbox-sampled/?min_lat=${bboxCoordinates.min_lat}&min_lon=${bboxCoordinates.min_lon}&max_lat=${bboxCoordinates.max_lat}&max_lon=${bboxCoordinates.max_lon}&data_source=${dataSource}&variable=${variable}`;
-                // Add variable if it's SoilGrids (has multiple variables)
-                if (dataSource === 'soil') {
-                    apiUrl += `&variable=${variable}`;
-                }
-            } else {
 
-                // Time series mode - will use 5 random points
+            let apiUrl = '';
+            const isTimeSeries = !(dataSource === 'elev' || dataSource === 'soil');
+
+            if (isTimeSeries) {
                 const startDate = document.getElementById('bbox-start-date').value;
                 const endDate = document.getElementById('bbox-end-date').value;
-                // Validate dates
+
                 if (!startDate || !endDate) {
                     showError('Please select start and end dates.');
+                    isFetching = false;
                     return;
                 }
-                apiUrl = `/climate-data-timeseries-bbox-sampled/?min_lat=${bboxCoordinates.min_lat}&min_lon=${bboxCoordinates.min_lon}&max_lat=${bboxCoordinates.max_lat}&max_lon=${bboxCoordinates.max_lon}&start_date=${startDate}&end_date=${endDate}&data_source=${dataSource}&variable=${variable}`;
 
+                apiUrl = `/climate-data-timeseries-bbox-sampled/?min_lat=${bboxCoordinates.min_lat}&min_lon=${bboxCoordinates.min_lon}&max_lat=${bboxCoordinates.max_lat}&max_lon=${bboxCoordinates.max_lon}&start_date=${startDate}&end_date=${endDate}&data_source=${dataSource}&variable=${variable}`;
+            } else {
+                apiUrl = `/climate-data-timeseries-bbox-sampled/?min_lat=${bboxCoordinates.min_lat}&min_lon=${bboxCoordinates.min_lon}&max_lat=${bboxCoordinates.max_lat}&max_lon=${bboxCoordinates.max_lon}&data_source=${dataSource}&variable=${variable}`;
             }
-            // Show loading
+
             document.getElementById('loading').style.display = 'block';
             document.getElementById('error').textContent = '';
+
             try {
-                // Fetch data
                 const response = await fetch(apiUrl);
                 if (!response.ok) {
                     const errorData = await response.json();
                     throw new Error(errorData.detail || 'Failed to fetch data');
                 }
+
                 const data = await response.json();
-                // Clear any existing point markers
+
                 drawnItems.eachLayer(function (layer) {
                     if (layer instanceof L.CircleMarker) {
                         drawnItems.removeLayer(layer);
                     }
                 });
 
-                displayBoundingBoxTimeSeries(data);
+                if (data.message && data.points?.length === 0) {
+                    showError(data.message);
+                } else if (isTimeSeries) {
+                    displayBoundingBoxTimeSeries(data);
+                } else {
+                    // Handle static data (soil, elev)
+                    const variable = document.getElementById('variable-bbox').value;
+
+                    data.points.forEach((point, index) => {
+                        const lat = point.lat;
+                        const lon = point.lon;
+                        const values = point.values;
+
+                        // Draw marker for the static point
+                        const value = values[variable] ?? 0;
+
+                        const marker = L.circleMarker([lat, lon], {
+                            radius: 5,
+                            fillColor: getColorForValue(value),
+                            color: '#000',
+                            weight: 1,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        }).addTo(drawnItems);
+
+                        marker.bindPopup(`
+                            <strong>Point ${index + 1}</strong><br>
+                            <strong>Position:</strong> ${lat.toFixed(6)}, ${lon.toFixed(6)}<br>
+                            <strong>${getVariableLabel(variable, dataSource)}:</strong> ${value.toFixed(2)} ${getUnitLabel(variable, dataSource)}
+                        `);
+
+                        // On click, show the bar chart using displayStaticData
+                        marker.on('click', function () {
+                            const chartPayload = {
+                                location: { lat, lon },
+                                data: Object.keys(values).map(v => ({
+                                    variable: v,
+                                    value: values[v]
+                                }))
+                            };
+                            displayStaticData(chartPayload, dataSource);
+                        });
+                    });
+
+                    // Show the first point’s chart by default
+                    if (data.points.length > 0) {
+                        const firstPoint = data.points[0];
+                        const chartPayload = {
+                            location: { lat: firstPoint.lat, lon: firstPoint.lon },
+                            data: Object.keys(firstPoint.values).map(v => ({
+                                variable: v,
+                                value: firstPoint.values[v]
+                            }))
+                        };
+                        displayStaticData(chartPayload, dataSource);
+                    }
+
+                    // Show a static summary
+                    document.getElementById('points-summary').innerHTML = `
+                        <p><strong>Sample points:</strong> ${data.points.length} of 5 samples</p>
+                        <p><strong>Click a point to view its static data chart.</strong></p>
+                    `;
+                    document.getElementById('points-info').style.display = 'block';
+                }
 
             } catch (error) {
                 showError(error.message);
             } finally {
-                // Hide loading
                 document.getElementById('loading').style.display = 'none';
+                isFetching = false;
             }
         });
+
         // Clear point selection button click handler
         document.getElementById('clear-point-selection').addEventListener('click', function () {
             // Clear selected point
@@ -922,212 +986,113 @@
         }
         // Function to display static data for a single point (modified to handle multiple soil properties)
         function displayStaticData(data, dataSource) {
-    const ctx = document.getElementById('timeSeriesChart').getContext('2d');
-    if (timeSeriesChart) {
-        timeSeriesChart.destroy();
-    }
-
-    const isMulti = Array.isArray(data.data) && data.data.length > 1;
-    const isSingle = Array.isArray(data.data) && data.data.length === 1;
-
-    if ((dataSource === 'soil' || dataSource === 'elev') && isMulti) {
-        // Multiple variables returned (e.g., all of soilgrids or elevation derivatives)
-        const properties = data.data.map(d => d.variable);
-        const datasets = data.data.map(d => ({
-            label: getVariableLabel(d.variable, dataSource),
-            data: [d.value],
-            backgroundColor: getChartColor(d.variable, 0.6),
-            borderColor: getChartColor(d.variable),
-            borderWidth: 1
-        }));
-
-        timeSeriesChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: ['Static Variables'],
-                datasets: datasets
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: false,
-                        title: {
-                            display: true,
-                            text: 'Value'
-                        }
-                    }
-                },
-                plugins: {
-                    title: {
-                        display: true,
-                        text: `${dataSource === 'soil' ? 'Soil' : 'Elevation'} Variables at Lat: ${data.location.lat}, Lon: ${data.location.lon}`
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function (context) {
-                                const variable = properties[context.datasetIndex];
-                                return `${context.dataset.label}: ${context.raw} ${getUnitLabel(variable, dataSource)}`;
-                            }
-                        }
-                    }
-                }
+            const ctx = document.getElementById('timeSeriesChart').getContext('2d');
+            if (timeSeriesChart) {
+                timeSeriesChart.destroy();
             }
-        });
-    } else if (isSingle) {
-        // Only one variable returned
-        const variable = data.data[0].variable;
-        const value = data.data[0].value;
 
-        timeSeriesChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: [getVariableLabel(variable, dataSource)],
-                datasets: [{
-                    label: getVariableLabel(variable, dataSource),
-                    data: [value],
-                    backgroundColor: getChartColor(variable, 0.6),
-                    borderColor: getChartColor(variable),
+            const isMulti = Array.isArray(data.data) && data.data.length > 1;
+            const isSingle = Array.isArray(data.data) && data.data.length === 1;
+
+            if ((dataSource === 'soil' || dataSource === 'elev') && isMulti) {
+                // Multiple variables returned (e.g., all of soilgrids or elevation derivatives)
+                const properties = data.data.map(d => d.variable);
+                const datasets = data.data.map(d => ({
+                    label: getVariableLabel(d.variable, dataSource),
+                    data: [d.value],
+                    backgroundColor: getChartColor(d.variable, 0.6),
+                    borderColor: getChartColor(d.variable),
                     borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: false,
-                        title: {
-                            display: true,
-                            text: getUnitLabel(variable, dataSource)
-                        }
-                    }
-                },
-                plugins: {
-                    title: {
-                        display: true,
-                        text: `${getVariableLabel(variable, dataSource)} at Lat: ${data.location.lat}, Lon: ${data.location.lon}`
+                }));
+
+                timeSeriesChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Static Variables'],
+                        datasets: datasets
                     },
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function (context) {
-                                return `${context.dataset.label}: ${context.raw} ${getUnitLabel(variable, dataSource)}`;
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                title: {
+                                    display: true,
+                                    text: 'Value'
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: `${dataSource === 'soil' ? 'Soil' : 'Elevation'} Variables at Lat: ${data.location.lat}, Lon: ${data.location.lon}`
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function (context) {
+                                        const variable = properties[context.datasetIndex];
+                                        return `${context.dataset.label}: ${context.raw} ${getUnitLabel(variable, dataSource)}`;
+                                    }
+                                }
                             }
                         }
-                    }
-                }
-            }
-        });
-    } else {
-        console.error("Unexpected or missing data format:", data);
-        alert("No valid static data available for this location.");
-    }
-}
-
-
-
-
-        // Update the fetch point data button click handler to use the modified API URL
-        document.getElementById('fetch-point-data').addEventListener('click', async function () {
-            if (!selectedPoint) {
-                showError('Please select a point on the map first.');
-                return;
-            }
-
-            const dataSource = document.getElementById('data-source-point').value;
-            const variable = document.getElementById('variable-point').value;
-            let apiUrl = ''; // <-- keep this
-
-            if (dataSource === 'elev' || dataSource === 'soil') {
-                apiUrl = `/climate-data-timeseries/?lat=${selectedPoint.lat}&lon=${selectedPoint.lon}&data_source=${dataSource}&variable=${variable}`;
-            } else {
-                const startDate = document.getElementById('start-date').value;
-                const endDate = document.getElementById('end-date').value;
-                if (!startDate || !endDate) {
-                    showError('Please select start and end dates.');
-                    return;
-                }
-                apiUrl = `/climate-data-timeseries/?lat=${selectedPoint.lat}&lon=${selectedPoint.lon}&start_date=${startDate}&end_date=${endDate}&data_source=${dataSource}&variable=${variable}`;
-            }
-
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('error').textContent = '';
-
-            try {
-                const response = await fetch(apiUrl);
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || 'Failed to fetch data');
-                }
-                const data = await response.json();
-                console.log(data);
-                if (dataSource === 'elev' || dataSource === 'soil') {
-                    displayStaticData(data, dataSource);
-                } else {
-                    displayTimeSeriesData(data);
-                }
-            } catch (error) {
-                showError(error.message);
-            } finally {
-                document.getElementById('loading').style.display = 'none';
-            }
-        });
-
-        // Updated fetch bounding box data button click handler
-        document.getElementById('fetch-bbox-data').addEventListener('click', async function () {
-            // Check if a bounding box is selected
-            if (!bboxCoordinates) {
-                showError('Please draw a bounding box on the map first.');
-                return;
-            }
-            // Get form values
-            const dataSource = document.getElementById('data-source-bbox').value;
-            const variable = document.getElementById('variable-bbox').value;
-            // Always in time series mode now
-            const startDate = document.getElementById('bbox-start-date').value;
-            const endDate = document.getElementById('bbox-end-date').value;
-            // Validate dates
-            if (!startDate || !endDate) {
-                showError('Please select start and end dates.');
-                return;
-            }
-            // Build API URL for time series data
-            const apiUrl = `/climate-data-timeseries-bbox-sampled/?min_lat=${bboxCoordinates.min_lat}&min_lon=${bboxCoordinates.min_lon}&max_lat=${bboxCoordinates.max_lat}&max_lon=${bboxCoordinates.max_lon}&start_date=${startDate}&end_date=${endDate}&data_source=${dataSource}&variable=${variable}`;
-            // Show loading
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('error').textContent = '';
-            try {
-                // Fetch data
-                const response = await fetch(apiUrl);
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || 'Failed to fetch data');
-                }
-                const data = await response.json();
-                // Clear any existing point markers
-                drawnItems.eachLayer(function (layer) {
-                    if (layer instanceof L.CircleMarker) {
-                        drawnItems.removeLayer(layer);
                     }
                 });
-                // Check if we received a message with no points (no data in bbox)
-                if (data.message && data.points.length === 0) {
-                    showError(data.message);
-                    return;
-                }
-                // Display time series data
-                displayBoundingBoxTimeSeries(data);
-            } catch (error) {
-                showError(error.message);
-            } finally {
-                // Hide loading
-                document.getElementById('loading').style.display = 'none';
+            } else if (isSingle) {
+                // Only one variable returned
+                const variable = data.data[0].variable;
+                const value = data.data[0].value;
+
+                timeSeriesChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: [getVariableLabel(variable, dataSource)],
+                        datasets: [{
+                            label: getVariableLabel(variable, dataSource),
+                            data: [value],
+                            backgroundColor: getChartColor(variable, 0.6),
+                            borderColor: getChartColor(variable),
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                title: {
+                                    display: true,
+                                    text: getUnitLabel(variable, dataSource)
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: `${getVariableLabel(variable, dataSource)} at Lat: ${data.location.lat}, Lon: ${data.location.lon}`
+                            },
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function (context) {
+                                        return `${context.dataset.label}: ${context.raw} ${getUnitLabel(variable, dataSource)}`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } else {
+                console.error("Unexpected or missing data format:", data);
+                alert("No valid static data available for this location.");
             }
-        });
+        }
+
+
         // Helper function to get color based on value
         function getColorForValue(value, alpha = 1) {
             // Normalize value to 0-1 range (assuming range from -50 to 50)
