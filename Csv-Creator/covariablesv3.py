@@ -58,6 +58,69 @@ def get_season(date):
         return year, "Winter"
     else:
         return year, "Spring"
+    
+def compute_solar_radiation_from_wc_range(df: pd.DataFrame) -> pd.DataFrame:
+    from math import pi
+
+    output_rows = []
+
+    for idx, row in tqdm(df.iterrows(), total=len(df), desc="SolarRad"):
+        lat = row['latitude']
+        lon = row['longitude']
+        try:
+            start = pd.to_datetime(row['start'])
+            end = pd.to_datetime(row['end'])
+        except Exception:
+            continue
+
+        months = pd.date_range(start=start, end=end, freq='MS')
+        rs_by_year = {}
+
+        if idx == 0:
+            print("Example tmax_col:", f'wc_tmax_{months[0].strftime("%Y-%m")}-01')
+            print("df.columns[:10]:", df.columns[:10].tolist())
+
+        for dt in months:
+            year = dt.year
+            month_str = dt.strftime('%Y-%m') + '-01'
+            tmax_col = f'wc_tmax_{month_str}'
+            tmin_col = f'wc_tmin_{month_str}'
+
+            if tmax_col not in df.columns or tmin_col not in df.columns:
+                continue
+
+            try:
+                tmax = float(row[tmax_col])
+                tmin = float(row[tmin_col])
+                if np.isnan(tmax) or np.isnan(tmin): continue
+            except:
+                continue
+
+            J = 30 * (dt.month - 1) + 15
+            lat_rad = lat * pi / 180
+            delta = 0.409 * np.sin(2 * pi * J / 365 - 1.39)
+            dr = 1 + 0.033 * np.cos(2 * pi * J / 365)
+            ws = np.arccos(-np.tan(lat_rad) * np.tan(delta))
+            Ra = (24 * 60 / pi) * 0.0820 * dr * (
+                ws * np.sin(lat_rad) * np.sin(delta) +
+                np.cos(lat_rad) * np.cos(delta) * np.sin(ws)
+            )
+            Rs = 0.16 * np.sqrt(tmax - tmin) * Ra
+            rs_by_year.setdefault(year, []).append(Rs)
+
+        for year, rs_list in rs_by_year.items():
+            avg_rs = np.nanmean(rs_list)
+            output_rows.append({
+                'latitude': lat,
+                'longitude': lon,
+                'year': year,
+                'Har_SolarRad_Mean': avg_rs
+            })
+    
+    print(f"Computed solar radiation for {len(output_rows)} location-years.")
+    return pd.DataFrame(output_rows)
+
+
 
 def extract_et_covariates(df: pd.DataFrame) -> pd.DataFrame:
     pattern = re.compile(r"et_et_(\d{4})-(\d{2})")
@@ -520,8 +583,9 @@ def main():
     era5_p_df = extract_era5_totprec(df)
     era5_rest_df = extract_era5_covariates(df)
     era5_quartile = extract_era5_temp_precip_covariates(df)
+    SolarRad = compute_solar_radiation_from_wc_range(df)
 
-    dynamic_dfs = [chirps_df, et_df, wc_df, spei_df, tc_df, np_df, era5_p_df, era5_rest_df, era5_quartile]
+    dynamic_dfs = [chirps_df, et_df, wc_df, spei_df, tc_df, np_df, era5_p_df, era5_rest_df, era5_quartile, SolarRad]
     for i, d in enumerate(dynamic_dfs):
         if d is not None and not d.empty:
             dynamic_dfs[i] = d.groupby(['latitude', 'longitude', 'year']).first().reset_index()
