@@ -500,7 +500,7 @@ def main():
         return
     
         # --- Extract static elev_ and soil_ columns ---
-    static_cols = ['latitude', 'longitude'] + [col for col in df.columns if col.startswith("elev_") or col.startswith("soil_") or col.startswith("bio_")]
+    static_cols = ['latitude', 'longitude'] + [col for col in df.columns if col.startswith("elev_") or col.startswith("soil_") or col.startswith("bio_") or col.startswith("koppen_")]
     static_df = df[static_cols].drop_duplicates(subset=["latitude", "longitude"])
 
     chirps_df = extract_chirps_covariates_from_daily_columns(df)

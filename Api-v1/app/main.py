@@ -92,6 +92,9 @@ AVAILABLE_VARIABLES = {
         "bio11", "bio12", "bio13", "bio14", "bio15",
         "bio16", "bio17", "bio18", "bio19"
     ],
+    DataSource.KOPPEN: ["bsh", "dfb", "cfc", "cfa", "ef", "cwc", "af", "et", "cwb", "cwa",
+    "csc", "bwk", "aw", "bsk", "dsb", "csa", "all", "dwb", "am", "dfc",
+    "dwc", "cfb", "bwh", "csb", "dsc"],
 }
 
 DATASOURCES_WITH_VARIABLES = [
@@ -101,7 +104,8 @@ DATASOURCES_WITH_VARIABLES = [
     DataSource.ERA5,
     DataSource.ELEVATION,
     DataSource.SOILGRIDS,
-    DataSource.BIOCLIM
+    DataSource.BIOCLIM,
+    DataSource.KOPPEN
 ]
 
 STATIC_DATA_SOURCES = [

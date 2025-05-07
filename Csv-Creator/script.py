@@ -59,7 +59,7 @@ def detect_date_columns(df):
         return None, None
 
 
-STATIC_SOURCES = {'elev', 'soil', 'bio'}
+STATIC_SOURCES = {'elev', 'soil', 'bio', 'koppen'}
 
 DATA_SOURCES = {
     "wc": ["prec", "tmax", "tmin"],
@@ -83,7 +83,10 @@ DATA_SOURCES = {
     "bio": ["bio1", "bio2", "bio3", "bio4", "bio5",
         "bio6", "bio7", "bio8", "bio9", "bio10",
         "bio11", "bio12", "bio13", "bio14", "bio15",
-        "bio16", "bio17", "bio18", "bio19"]
+        "bio16", "bio17", "bio18", "bio19"],
+    "koppen": ["bsh", "dfb", "cfc", "cfa", "ef", "cwc", "af", "et", "cwb", "cwa",
+    "csc", "bwk", "aw", "bsk", "dsb", "csa", "all", "dwb", "am", "dfc",
+    "dwc", "cfb", "bwh", "csb", "dsc"]
 }
 
 def save_cache(cache, cache_file_path):
