@@ -1,2 +1,4 @@
 Api-v1/venv/
 Api-v1/app/__pycache__
+Csv-Creator/uploads
+Csv-Creator/processed
