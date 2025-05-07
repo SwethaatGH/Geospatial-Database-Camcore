@@ -76,10 +76,6 @@ def compute_solar_radiation_from_wc_range(df: pd.DataFrame) -> pd.DataFrame:
         months = pd.date_range(start=start, end=end, freq='MS')
         rs_by_year = {}
 
-        if idx == 0:
-            print("Example tmax_col:", f'wc_tmax_{months[0].strftime("%Y-%m")}-01')
-            print("df.columns[:10]:", df.columns[:10].tolist())
-
         for dt in months:
             year = dt.year
             month_str = dt.strftime('%Y-%m') + '-01'
@@ -206,7 +202,7 @@ def calculate_precip_covariates(date_range, coordinates, precip_values, prefix="
         Std_Dev="std",
         CV=lambda x: x.std() / x.mean() if x.mean() != 0 else np.nan,
         Skew=lambda x: skew(x, nan_policy='omit'),
-        Kurtosis=lambda x: kurtosis(x, nan_policy='omit'),
+        Kurtosis=lambda x: kurtosis(x, nan_policy='omit') if x.count() >= 4 and x.std() > 0 else np.nan,
         Q5=lambda x: x.quantile(0.05),
         Q95=lambda x: x.quantile(0.95)
     ).reset_index()
@@ -279,7 +275,7 @@ def extract_era5_covariates(df: pd.DataFrame) -> pd.DataFrame:
             max='max',
             std='std',
             skew='skew',
-            kurtosis=lambda x: kurtosis(x, nan_policy='omit'),  # <-- Fix here
+            kurtosis=lambda x: kurtosis(x, nan_policy='omit') if x.count() >= 4 and x.std() > 0 else np.nan,
             p5=lambda x: x.quantile(0.05),
             p95=lambda x: x.quantile(0.95),
             cv=lambda x: x.std() / x.mean() if x.mean() != 0 else np.nan
@@ -477,7 +473,7 @@ def extract_monthly_covariates(df: pd.DataFrame, source: str, variables: list, p
                 'Std': group.std(),
                 'CV': group.std() / group.mean(),
                 'Skew': group.apply(lambda x: x.skew()),
-                'Kurtosis': group.apply(lambda x: x.kurtosis()),
+                'Kurtosis': group.apply(lambda x: x.kurtosis() if x.count() >= 4 and x.std() > 0 else np.nan),
                 'Q5': group.apply(lambda x: x.quantile(0.05)),
                 'Q95': group.apply(lambda x: x.quantile(0.95))
             }
