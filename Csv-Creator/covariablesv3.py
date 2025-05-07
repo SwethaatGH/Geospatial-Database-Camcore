@@ -144,7 +144,7 @@ def extract_et_covariates(df: pd.DataFrame) -> pd.DataFrame:
         if grouped.size().empty:
             continue
 
-        summary_df = grouped.agg(['min', 'max', 'std']).reset_index()
+        summary_df = grouped.agg(['min', 'max', 'std', 'mean']).reset_index()
         summary_df['CV'] = summary_df['std'] / grouped.mean().values
 
         for _, row_cov in summary_df.iterrows():

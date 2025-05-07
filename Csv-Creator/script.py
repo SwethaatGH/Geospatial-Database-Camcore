@@ -161,6 +161,11 @@ async def process_csv_file(input_csv_path, output_csv_path, default_start_date=N
                         date_str = entry.get("date") or f"{entry['year']}-{entry['month']:02d}"
                         for v, val in entry.get("values", {}).items():
                             key = f"{source}_{v}_{date_str}"
+
+                            # Convert ERA5 temperature variables from Kelvin to Celsius
+                            if source == "era5" and v in {"sktemp", "sotemp1", "sotemp2", "sotemp3", "temp"}:
+                                val = val - 273.15  # Kelvin to Celsius
+
                             row_updates[key] = val
                             new_columns.add(key)
 
