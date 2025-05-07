@@ -12,34 +12,35 @@ def compute_biovars(prec, tmin, tmax):
     prec = np.array(prec)
 
     bio = np.empty(19)
-    bio[0] = temp.mean()                          # BIO1
-    bio[1] = temp.max() - temp.min()              # BIO2
-    bio[2] = np.std(temp, ddof=1) * 100           # BIO4
-    bio[3] = np.sum(prec)                         # BIO12
-    bio[4] = prec.max()                           # BIO13
-    bio[5] = prec.min()                           # BIO14
-    bio[6] = temp[prec.argmax()]                  # BIO8
-    bio[7] = temp[prec.argmin()]                  # BIO9
-    bio[8] = np.max(tmax)                         # BIO5
-    bio[9] = np.min(tmin)                         # BIO6
-    bio[10] = np.mean([tmin[month-1] for month in [11,12,1]])  # BIO11 (mean temp of coldest quarter)
-    bio[11] = np.mean([tmax[month-1] for month in [6,7,8]])    # BIO10 (mean temp of warmest quarter)
 
-    # Approximate quarters for precipitation seasonality
-    quarters = [sum(prec[i:i+3]) for i in range(0, 12, 3)]
+    bio[0]  = temp.mean()                          # BIO1: Annual Mean Temperature
+    bio[1]  = np.mean(np.array(tmax) - np.array(tmin))  # BIO2: Mean Diurnal Range
+    bio[2]  = (bio[1] / (np.max(tmax) - np.min(tmin))) * 100  # BIO3: Isothermality
+    bio[3]  = np.std(temp, ddof=1) * 100            # BIO4: Temperature Seasonality
+    bio[4]  = np.max(tmax)                          # BIO5: Max Temp of Warmest Month
+    bio[5]  = np.min(tmin)                          # BIO6: Min Temp of Coldest Month
+    bio[6]  = bio[4] - bio[5]                       # BIO7: Temperature Annual Range
+    bio[7]  = temp[np.argmax(prec)]                 # BIO8: Mean Temp of Wettest Month
+    bio[8]  = temp[np.argmin(prec)]                 # BIO9: Mean Temp of Driest Month
+    bio[9]  = np.mean([tmax[month - 1] + tmin[month - 1] for month in [6, 7, 8]]) / 2  # BIO10: Mean Temp of Warmest Quarter
+    bio[10] = np.mean([tmax[month - 1] + tmin[month - 1] for month in [11, 12, 1]]) / 2 # BIO11: Mean Temp of Coldest Quarter
+    bio[11] = prec.sum()                            # BIO12: Annual Precipitation
+    bio[12] = prec.max()                            # BIO13: Precip of Wettest Month
+    bio[13] = prec.min()                            # BIO14: Precip of Driest Month
+    bio[14] = (np.std(prec, ddof=1) / np.mean(prec)) * 100  # BIO15: Precip Seasonality (CV)
+
+    quarters = [sum(prec[i:i+3]) for i in [0, 3, 6, 9]]
     wettest_q = np.argmax(quarters)
     driest_q = np.argmin(quarters)
-    bio[12] = quarters[wettest_q]                # BIO16
-    bio[13] = quarters[driest_q]                 # BIO17
 
-    bio[14] = sum(prec > 100)                    # BIO18
-    bio[15] = sum(prec < 20)                     # BIO19
+    bio[15] = quarters[wettest_q]                   # BIO16: Precip of Wettest Quarter
+    bio[16] = quarters[driest_q]                    # BIO17: Precip of Driest Quarter
 
-    bio[16] = (np.mean(tmax) + np.mean(tmin)) / 2  # BIO3 approximation
-    bio[17] = np.mean(np.array(tmax) - np.array(tmin))  # Mean diurnal range
-    bio[18] = np.mean((tmax - temp) * (prec / 100))     # BIO7-ish, weighted daily range (not exact)
+    bio[17] = sum(prec[i] for i in range(wettest_q * 3, wettest_q * 3 + 3))  # BIO18: Precip of Warmest Quarter (assumed same as wettest)
+    bio[18] = sum(prec[i] for i in range(driest_q * 3, driest_q * 3 + 3))    # BIO19: Precip of Coldest Quarter (assumed same as driest)
 
     return bio
+
 
 def get_season_monthly(month):
     if month in [1, 2, 3]: return "Summer"
@@ -117,7 +118,6 @@ def compute_solar_radiation_from_wc_range(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(output_rows)
 
 
-
 def extract_et_covariates(df: pd.DataFrame) -> pd.DataFrame:
     pattern = re.compile(r"et_et_(\d{4})-(\d{2})")
     et_columns = [col for col in df.columns if pattern.match(col)]
@@ -154,6 +154,7 @@ def extract_et_covariates(df: pd.DataFrame) -> pd.DataFrame:
                 'year': int(row_cov['Year'])
             }
             season_code = row_cov['Season'][:2]  # Wi, Sp, Su, Au
+            result[f'ET_Mean_{season_code}'] = row_cov['mean']
             result[f'ET_Min_{season_code}'] = row_cov['min']
             result[f'ET_Max_{season_code}'] = row_cov['max']
             result[f'ET_Std_{season_code}'] = row_cov['std']
@@ -473,7 +474,6 @@ def extract_monthly_covariates(df: pd.DataFrame, source: str, variables: list, p
                 'Std': group.std(),
                 'CV': group.std() / group.mean(),
                 'Skew': group.apply(lambda x: x.skew()),
-                'Kurtosis': group.apply(lambda x: x.kurtosis() if x.count() >= 4 and x.std() > 0 else np.nan),
                 'Q5': group.apply(lambda x: x.quantile(0.05)),
                 'Q95': group.apply(lambda x: x.quantile(0.95))
             }
