@@ -196,7 +196,7 @@ def calculate_precip_covariates(date_range, coordinates, precip_values, prefix="
     df["Month"] = df["Date"].dt.month
 
     # Seasonal aggregation
-    seasonal_stats = df.groupby(["Year", "Season"])["Precipitation"].agg(
+    seasonal_stats = df.groupby(["Year", "Season"], as_index=False)["Precipitation"].agg(
         Sum="sum",
         Mean="mean",
         Median="median",
@@ -206,7 +206,7 @@ def calculate_precip_covariates(date_range, coordinates, precip_values, prefix="
         Kurtosis=lambda x: kurtosis(x, nan_policy='omit') if x.count() >= 4 and x.std() > 0 else np.nan,
         Q5=lambda x: x.quantile(0.05),
         Q95=lambda x: x.quantile(0.95)
-    ).reset_index()
+    )
 
     # Additional seasonal indicators
     days_at_0mm = df[df["Precipitation"] == 0].groupby(["Year", "Season"]).size().reset_index(name="DAt_0")
@@ -256,45 +256,54 @@ def extract_era5_covariates(df: pd.DataFrame) -> pd.DataFrame:
         if not matching_cols:
             continue
 
-        dates = [pd.to_datetime(f"{pattern.match(col).group(1)}-{pattern.match(col).group(2)}-{pattern.match(col).group(3)}")
-                 for col in matching_cols]
-
         for idx, row in tqdm(df.iterrows(), total=len(df), desc=f"Processing ERA5 {var} covariates"):
             lat = row['latitude']
             lon = row['longitude']
-            values = pd.to_numeric(row[matching_cols].values.tolist(), errors='coerce')
 
-            tmp_df = pd.DataFrame({'Date': dates, 'Value': values})
-            tmp_df = tmp_df.dropna()
+            valid_cols = [col for col in matching_cols if not pd.isna(row[col])]
+            if not valid_cols:
+                continue
+
+            dates, values = [], []
+            for col in valid_cols:
+                m = pattern.match(col)
+                if m:
+                    dates.append(pd.to_datetime(f"{m.group(1)}-{m.group(2)}-{m.group(3)}"))
+                    values.append(pd.to_numeric(row[col], errors='coerce'))
+
+            if not values or all(pd.isna(values)):
+                continue
+
+            tmp_df = pd.DataFrame({'Date': dates, 'Value': values}).dropna()
             tmp_df['Year'] = tmp_df['Date'].dt.year
             tmp_df['Season'] = tmp_df['Date'].apply(lambda d: get_season(d)[1])
 
             grouped = tmp_df.groupby(['Year', 'Season'])['Value']
             summary = grouped.agg(
-            mean='mean',
-            min='min',
-            max='max',
-            std='std',
-            skew='skew',
-            kurtosis=lambda x: kurtosis(x, nan_policy='omit') if x.count() >= 4 and x.std() > 0 else np.nan,
-            p5=lambda x: x.quantile(0.05),
-            p95=lambda x: x.quantile(0.95),
-            cv=lambda x: x.std() / x.mean() if x.mean() != 0 else np.nan
-        ).reset_index()
+                mean='mean',
+                min='min',
+                max='max',
+                std='std',
+                skew='skew',
+                kurtosis=lambda x: kurtosis(x, nan_policy='omit') if x.count() >= 4 and x.std() > 0 else np.nan,
+                p5=lambda x: x.quantile(0.05),
+                p95=lambda x: x.quantile(0.95),
+                cv=lambda x: x.std() / x.mean() if x.mean() != 0 else np.nan
+            ).reset_index()
 
-        for _, row_cov in summary.iterrows():
-            result = {
-                'latitude': lat,
-                'longitude': lon,
-                'year': int(row_cov['Year'])
-            }
-            season_code = row_cov['Season'][:2]
-            for stat_key, label in zip(
-                ['mean', 'min', 'max', 'std', 'cv', 'skew', 'kurtosis', 'p5', 'p95'],
-                ['mean', 'min', 'max', 'std', 'CV', 'Skew', 'Kurtosis', 'Q5', 'Q95']
-            ):
-                result[f"ERA5_{var}_{label}_{season_code}"] = row_cov[stat_key]
-            all_results.append(result)
+            for _, row_cov in summary.iterrows():
+                result = {
+                    'latitude': lat,
+                    'longitude': lon,
+                    'year': int(row_cov['Year'])
+                }
+                season_code = row_cov['Season'][:2]
+                for stat_key, label in zip(
+                    ['mean', 'min', 'max', 'std', 'cv', 'skew', 'kurtosis', 'p5', 'p95'],
+                    ['mean', 'min', 'max', 'std', 'CV', 'Skew', 'Kurtosis', 'Q5', 'Q95']
+                ):
+                    result[f"ERA5_{var}_{label}_{season_code}"] = row_cov[stat_key]
+                all_results.append(result)
 
     return pd.DataFrame(all_results)
 
