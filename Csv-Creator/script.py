@@ -165,6 +165,9 @@ async def process_csv_file(input_csv_path, output_csv_path, default_start_date=N
                             # Convert ERA5 temperature variables from Kelvin to Celsius
                             if source == "era5" and v in {"sktemp", "sotemp1", "sotemp2", "sotemp3", "temp"}:
                                 val = val - 273.15  # Kelvin to Celsius
+                            
+                            if source == 'era5' and v in {"totprec"}:
+                                val = val * 1000
 
                             row_updates[key] = val
                             new_columns.add(key)
