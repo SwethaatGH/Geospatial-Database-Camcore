@@ -71,8 +71,11 @@ def compute_solar_radiation_from_wc_range(df: pd.DataFrame) -> pd.DataFrame:
         try:
             start = pd.to_datetime(row['start'])
             end = pd.to_datetime(row['end'])
+            if pd.isna(start) or pd.isna(end):
+                continue
         except Exception:
             continue
+
 
         months = pd.date_range(start=start, end=end, freq='MS')
         rs_by_year = {}
@@ -233,17 +236,23 @@ def calculate_precip_covariates(date_range, coordinates, precip_values, prefix="
         columns={col: f"{prefix}{col}" for col in seasonal_stats.columns if col not in ["Location", "Year"]}
     )
 
-    # --- Annual precipitation stats (extra) ---
-    extra = df.groupby("Year").apply(lambda x: pd.Series({
-        f"{prefix}Pr_Total": x["Precipitation"].sum(),
-        f"{prefix}Pr_WetMon": x.groupby("Month")["Precipitation"].sum().max(),
-        f"{prefix}Pr_DryMon": x.groupby("Month")["Precipitation"].sum().min()
-    })).reset_index()
+    monthly_sum = df.groupby(["Year", "Month"])["Precipitation"].sum().reset_index()
+    annual_total = df.groupby("Year")["Precipitation"].sum().reset_index(name=f"{prefix}Pr_Total")
+    wet_dry = monthly_sum.groupby("Year")["Precipitation"].agg([
+        ("WetMon", "max"),
+        ("DryMon", "min")
+    ]).reset_index()
+    wet_dry = wet_dry.rename(columns={
+        "WetMon": f"{prefix}Pr_WetMon",
+        "DryMon": f"{prefix}Pr_DryMon"
+    })
+    extra = pd.merge(annual_total, wet_dry, on="Year")
     extra["Location"] = f"lat{coordinates[1]}_lon{coordinates[0]}"
 
     # Merge seasonal + annual
     full_df = pd.merge(seasonal_stats, extra, on=["Year", "Location"], how="outer")
     return full_df
+
 
 def extract_era5_covariates(df: pd.DataFrame) -> pd.DataFrame:
     all_results = []
