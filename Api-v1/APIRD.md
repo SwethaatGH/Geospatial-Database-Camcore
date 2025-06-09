@@ -5,7 +5,7 @@
 3. Establish ssh tunnel to connect to postgis db on Camcore premises. 
 `ssh -L 5433:localhost:5432 user@remote.example.com`  
 4. Create venv
-5. Run `pip install -r .\app\requirements.text` to your venv
+5. Run `pip install -r .\app\requirementsv1.txt` to your venv
 6. Start dev server: `uvicorn app.main:app --reload` 
 7. To obtain temporary URL use ngrok 
 `ngrok http 8000 --domain=stingray-oriented-optionally.ngrok-free.app`

@@ -154,7 +154,8 @@ async def get_climate_data_timeseries(
 @app.post("/api/process-csv")
 async def process_csv(
     file: UploadFile = File(...),
-    option: str = Form(...)
+    option: str = Form(...),
+    variables: Optional[str] = Form(None),
 ):
     job_id = str(uuid.uuid4())
     upload_dir = Path(f"../Csv-Creator/uploads/{job_id}")
@@ -179,7 +180,8 @@ async def process_csv(
             "--output", str(raw_data_path),
             "--default-start-date", "2000-01-01",
             "--default-end-date", "2000-12-31",
-            "--cache-file", f"{processed_dir}/cache.json"
+            "--cache-file", f"{processed_dir}/cache.json",
+            "--vars", variables 
         ], check=True)
 
         if option == "full":
@@ -195,7 +197,6 @@ async def process_csv(
             "rawDataFile": f"/download/{job_id}/raw_data_{file.filename}",
             "covariatesFile": f"/download/{job_id}/covariates_{file.filename}" if option == "full" else None
         }
-
     except subprocess.CalledProcessError as e:
         raise HTTPException(status_code=500, detail=f"Processing error: {e}")
 

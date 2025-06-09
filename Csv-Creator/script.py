@@ -123,7 +123,9 @@ async def query_climate_data(lat, lon, start_date, end_date, data_source, variab
         cache[cache_hash] = result
     return result
 
-async def process_csv_file(input_csv_path, output_csv_path, default_start_date=None, default_end_date=None, cache_file_path="climate_data_cache.json"):
+async def process_csv_file(input_csv_path, output_csv_path, default_start_date=None, default_end_date=None,
+                           cache_file_path="climate_data_cache.json",
+                           selected_set = None):
     cache = load_cache(cache_file_path)
     df = pd.read_csv(input_csv_path)
     results_df = df.copy()
@@ -148,6 +150,8 @@ async def process_csv_file(input_csv_path, output_csv_path, default_start_date=N
 
         for source, variables in DATA_SOURCES.items():
             for var in variables:
+                if f"{source}:{var}" not in selected_set:
+                    continue
                 data = await query_climate_data(lat, lon, start_date, end_date, source, var, cache)
                 if not data or 'data' not in data:
                     continue
@@ -199,14 +203,19 @@ async def main():
     parser.add_argument('--default-start-date', default="2000-01-01")
     parser.add_argument('--default-end-date', default="2000-12-31")
     parser.add_argument('--cache-file', default="climate_data_cache.json")
+    parser.add_argument('--vars', default="[]")
     args = parser.parse_args()
+
+    selected_pairs = json.loads(args.vars)
+    selected_set = set(selected_pairs)
 
     await process_csv_file(
         input_csv_path=args.input,
         output_csv_path=args.output,
         default_start_date=args.default_start_date,
         default_end_date=args.default_end_date,
-        cache_file_path=args.cache_file
+        cache_file_path=args.cache_file,
+        selected_set=selected_set
     )
 
 if __name__ == "__main__":
