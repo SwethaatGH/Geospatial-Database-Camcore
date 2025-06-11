@@ -129,6 +129,23 @@
             padding: 10px;
             margin: 15px 0;
         }
+
+        #checkbox-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .source-group {
+            flex: 1 1 300px; /* Responsive width */
+            min-width: 280px;
+            max-width: 350px;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            padding: 12px;
+            border-radius: 6px;
+        }
+
     </style>
 </head>
 <body>
@@ -212,7 +229,7 @@
             let allChecked = true;  // start with everything checked by default
 
             toggleButton.addEventListener('click', () => {
-                const checkboxes = document.querySelectorAll('input[name="variable-checkbox"]');
+                const checkboxes = document.querySelectorAll('input.variable-checkbox, input.master-checkbox');
                 checkboxes.forEach(cb => cb.checked = !allChecked);
                 allChecked = !allChecked;
                 toggleButton.textContent = allChecked ? "Unselect All" : "Select All";
@@ -326,11 +343,24 @@
 
             for (const source in dataSources) {
                 const group = document.createElement('div');
-                group.style.marginBottom = '10px';
+                group.className = 'source-group';
                 
-                const sourceLabel = document.createElement('strong');
-                sourceLabel.textContent = `${dataSourceLabels[source] || source}:`;
+                const sourceLabel = document.createElement('label');
+                const sourceCheckbox = document.createElement('input');
+                sourceCheckbox.type = 'checkbox';
+                sourceCheckbox.checked = true;
+                sourceCheckbox.style.marginRight = '6px';
+                sourceCheckbox.className = 'master-checkbox';
+
+                const displayName = dataSourceLabels[source] || source;
+                sourceLabel.appendChild(sourceCheckbox);
+                sourceLabel.append(document.createTextNode(` ${displayName}:`));
                 group.appendChild(sourceLabel);
+
+                sourceCheckbox.addEventListener('change', () => {
+                    const checkboxes = group.querySelectorAll('input.variable-checkbox');
+                    checkboxes.forEach(cb => cb.checked = sourceCheckbox.checked);
+                });
 
                 dataSources[source].forEach(variable => {
                     const checkbox = document.createElement('input');
@@ -338,6 +368,7 @@
                     checkbox.name = 'variable-checkbox';
                     checkbox.value = `${source}:${variable}`;
                     checkbox.checked = true;
+                    checkbox.className = 'variable-checkbox';
 
                     const label = document.createElement('label');
                     label.style.marginLeft = '10px';
@@ -351,10 +382,6 @@
 
                 checkboxContainer.appendChild(group);
             }
-            
-            
-
-
 
             
             // Handle click on upload area
