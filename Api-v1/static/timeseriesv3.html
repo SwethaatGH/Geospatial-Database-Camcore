@@ -185,6 +185,7 @@
                         <option value="tc">TerraClim</option>
                         <option value="np">NASA POWER</option>
                         <option value="bio">Bioclim</option>
+                        <option value="koppen">Koppen</option>
                     </select>
                     <label for="variable-point">Variable:</label>
                     <select id="variable-point">
@@ -373,7 +374,7 @@
                 // Hide date controls because Bioclim is static
                 dateControls.style.display = 'none';
             }
-            else if(datasource == 'koppen'){
+            else if(dataSource === 'koppen'){
                 addOption(variableSelect, 'af', 'Tropical Rainforest (Af)');
                 addOption(variableSelect, 'am', 'Tropical Monsoon (Am)');
                 addOption(variableSelect, 'aw', 'Tropical Savanna (Aw)');
