@@ -185,6 +185,7 @@
                         <option value="tc">TerraClim</option>
                         <option value="np">NASA POWER</option>
                         <option value="bio">Bioclim</option>
+                        <option value="koppen">Koppen</option>
                     </select>
                     <label for="variable-point">Variable:</label>
                     <select id="variable-point">
@@ -218,6 +219,7 @@
                         <option value="tc">TerraClim</option>
                         <option value="np">NASA POWER</option>
                         <option value="bio">Bioclim</option>
+                        <option value="koppen">Koppen</option>
                     </select>
                     <label for="variable-bbox">Variable:</label>
                     <select id="variable-bbox">
@@ -370,6 +372,38 @@
                 addOption(variableSelect, 'bio19', 'Precipitation of Coldest Quarter (BIO19)');
 
                 // Hide date controls because Bioclim is static
+                dateControls.style.display = 'none';
+            }
+            else if(dataSource === 'koppen'){
+                addOption(variableSelect, 'af', 'Tropical Rainforest (Af)');
+                addOption(variableSelect, 'am', 'Tropical Monsoon (Am)');
+                addOption(variableSelect, 'aw', 'Tropical Savanna (Aw)');
+                addOption(variableSelect, 'bwh', 'Hot Desert (BWh)');
+                addOption(variableSelect, 'bwk', 'Cold Desert (BWk)');
+                addOption(variableSelect, 'bsh', 'Hot Steppe (BSh)');
+                addOption(variableSelect, 'bsk', 'Cold Steppe (BSk)');
+                addOption(variableSelect, 'csa', 'Dry - Hot Summer (Csa)');
+                addOption(variableSelect, 'csb', 'Dry - Warm Summer (Csb)');
+                addOption(variableSelect, 'csc', 'Dry - Cold Summer (Csc)');
+                addOption(variableSelect, 'cfa', 'Monsoonal - Hot Summer (Cfa)');
+                addOption(variableSelect, 'cfb', 'Monsoonal - Warm Summer (Cfb)');
+                addOption(variableSelect, 'cfc', 'Monsoonal - Cool Summer (Cfc)');
+                addOption(variableSelect, 'cwa', 'Dry Winter - Hot Summer (Cwa)');
+                addOption(variableSelect, 'cwb', 'Dry Winter - Warm Summer (Cwb)');
+                addOption(variableSelect, 'cwc', 'Dry Winter - Cool Summer (Cwc)');
+                addOption(variableSelect, 'dsa', 'Boreal - Dry Summer, Hot Summer (Dsa)');
+                addOption(variableSelect, 'dsb', 'Boreal - Dry Summer, Warm Summer (Dsb)');
+                addOption(variableSelect, 'dsc', 'Boreal - Dry Summer, Cool Summer  (Dsc)');
+                addOption(variableSelect, 'dfa', 'Boreal - No Dry Season, Hot Summer (Dfa)');
+                addOption(variableSelect, 'dfb', 'Boreal - No Dry Season, Warm Summer (Dfb)');
+                addOption(variableSelect, 'dfc', 'Boreal - No Dry Season, Cool Summer');
+                addOption(variableSelect, 'dfd', 'Boreal - No Dry Season, Very Cold Winter (Dfd)');
+                addOption(variableSelect, 'dwa', 'Boreal - Dry Winter, Hot Summer (Dwa)');
+                addOption(variableSelect, 'dwb', 'Boreal - Dry Winter, Warm Summer (Dwb)');
+                addOption(variableSelect, 'dwc', 'Boreal - Dry Winter, Cool Summer (Dwc)');
+                addOption(variableSelect, 'dwd', 'Boreal - Dry Winter, Very Cold Winter (Dwd)');
+                addOption(variableSelect, 'ef', 'Frost (EF)');
+                addOption(variableSelect, 'all', 'All Zones Combined (All)');
                 dateControls.style.display = 'none';
             }
 

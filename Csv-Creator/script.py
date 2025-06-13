@@ -68,7 +68,7 @@ DATA_SOURCES = {
     "et": ["et"],
     "elev": ["aspect", "elev", "flowdir", "hillshade", "roughness", "tpi", "tri", "slope"],
     "soil": ["bdod", "cec", "cfvo", "clay", "nitrogen", "ocd", "ocs", "phh2o", "sand", "silt", "soc", "wv0010", "wv0030", "wv1500"],
-    "tc": ["aet", "def", "pdsi", "pet", "ppt", "q", "soil", "srad", "tmin", "vap", "vpd", "ws"],
+    "tc": ["aet", "def", "pdsi", "pet", "ppt", "q", "soil", "srad", "tmin", "tmax", "vap", "vpd", "ws"],
     "np": ["airmass", "allsky_kt", "allsky_nkt", "allsky_sfc_lw_dwn", "allsky_sfc_lw_up", "allsky_sfc_par_diff",
            "allsky_sfc_par_dirh", "allsky_sfc_par_tot", "allsky_sfc_sw_diff", "allsky_sfc_sw_dirh", "allsky_sfc_sw_dni",
            "allsky_sfc_sw_dwn", "allsky_sfc_sw_up", "allsky_sfc_uv_index", "allsky_sfc_uva", "allsky_sfc_uvb",
@@ -123,23 +123,21 @@ async def query_climate_data(lat, lon, start_date, end_date, data_source, variab
         cache[cache_hash] = result
     return result
 
-async def process_csv_file(input_csv_path, output_csv_path, default_start_date=None, default_end_date=None, cache_file_path="climate_data_cache.json"):
-    cache = load_cache(cache_file_path)
-    df = pd.read_csv(input_csv_path)
-    results_df = df.copy()
-    new_columns = set()
-
-    all_rows_updates = []
-
-    # Detect date columns once
-    start_col, end_col = detect_date_columns(df)
-
-    for index, row in tqdm(df.iterrows(), total=len(df), desc="Processing rows"):
+async def process_one_row(
+    row,
+    index,
+    start_col,
+    end_col,
+    selected_set,
+    cache,
+    semaphore):
+    # Await on the semaphore to limit concurrency
+    async with semaphore:
         lat = row['latitude']
         lon = row['longitude']
 
-        start_date_raw = row.get(start_col) if start_col else default_start_date
-        end_date_raw = row.get(end_col) if end_col else default_end_date
+        start_date_raw = row.get(start_col)
+        end_date_raw = row.get(end_col)
 
         start_date = convert_date_format(start_date_raw)
         end_date = convert_date_format(end_date_raw)
@@ -148,6 +146,8 @@ async def process_csv_file(input_csv_path, output_csv_path, default_start_date=N
 
         for source, variables in DATA_SOURCES.items():
             for var in variables:
+                if f"{source}:{var}" not in selected_set:
+                    continue
                 data = await query_climate_data(lat, lon, start_date, end_date, source, var, cache)
                 if not data or 'data' not in data:
                     continue
@@ -156,7 +156,6 @@ async def process_csv_file(input_csv_path, output_csv_path, default_start_date=N
                     if source in STATIC_SOURCES:
                         key = f"{source}_{entry['variable']}"
                         row_updates[key] = entry['value']
-                        new_columns.add(key)
                     else:
                         date_str = entry.get("date") or f"{entry['year']}-{entry['month']:02d}"
                         for v, val in entry.get("values", {}).items():
@@ -164,32 +163,72 @@ async def process_csv_file(input_csv_path, output_csv_path, default_start_date=N
 
                             # Convert ERA5 temperature variables from Kelvin to Celsius
                             if source == "era5" and v in {"sktemp", "sotemp1", "sotemp2", "sotemp3", "temp"}:
-                                val = val - 273.15  # Kelvin to Celsius
-                            
+                                val = val - 273.15
                             if source == 'era5' and v in {"totprec"}:
                                 val = val * 1000
 
                             row_updates[key] = val
-                            new_columns.add(key)
 
-        all_rows_updates.append(row_updates)
-        # time.sleep(0.05)
+        # Return updates for this row
+        return (index, row_updates)
 
-    # Add new columns to avoid fragmentation
-    for col in sorted(new_columns):
-        if col not in results_df.columns:
-            results_df[col] = pd.NA
+async def process_csv_file(
+    input_csv_path,
+    output_csv_path,
+    default_start_date=None,
+    default_end_date=None,
+    cache_file_path="climate_data_cache.json",
+    selected_set=None,
+    max_concurrent=50
+):
+    cache = load_cache(cache_file_path)
+    df = pd.read_csv(input_csv_path)
+    results_df = df.copy()
 
-    # Apply all updates efficiently
-    for i, updates in enumerate(all_rows_updates):
-        if updates:
-            for key, value in updates.items():
-                results_df.iat[i, results_df.columns.get_loc(key)] = value
+    # Detect date columns once
+    start_col, end_col = detect_date_columns(df)
+
+    semaphore = asyncio.Semaphore(max_concurrent)
+
+    tasks = [
+        process_one_row(
+            row,
+            idx,
+            start_col,
+            end_col,
+            selected_set,
+            cache,
+            semaphore
+        )
+        for idx, row in df.iterrows()
+    ]
+
+    # tqdm for concurrent tasks: wrap with asyncio.as_completed
+    updates = []
+    for f in tqdm(asyncio.as_completed(tasks), total=len(tasks), desc="Processing rows"):
+        result = await f
+        updates.append(result)
+
+    # --- New efficient merging block ---
+    indices = []
+    updates_dicts = []
+    for idx, row_updates in updates:
+        indices.append(idx)
+        updates_dicts.append(row_updates)
+
+    # Create a DataFrame from the row_updates dicts, aligned to row indices
+    updates_df = pd.DataFrame(updates_dicts, index=indices)
+
+    # Concat with original DataFrame (aligns by index, adds all new columns at once)
+    final_df = pd.concat([results_df, updates_df], axis=1)
+
+    # Defragment DataFrame for max write speed
+    final_df = final_df.copy()
 
     save_cache(cache, cache_file_path)
-
-    results_df.to_csv(output_csv_path, index=False)
+    final_df.to_csv(output_csv_path, index=False)
     print(f"✅ Saved output to {output_csv_path}")
+
 
 
 async def main():
@@ -199,14 +238,19 @@ async def main():
     parser.add_argument('--default-start-date', default="2000-01-01")
     parser.add_argument('--default-end-date', default="2000-12-31")
     parser.add_argument('--cache-file', default="climate_data_cache.json")
+    parser.add_argument('--vars', default="[]")
     args = parser.parse_args()
+
+    selected_pairs = json.loads(args.vars)
+    selected_set = set(selected_pairs)
 
     await process_csv_file(
         input_csv_path=args.input,
         output_csv_path=args.output,
         default_start_date=args.default_start_date,
         default_end_date=args.default_end_date,
-        cache_file_path=args.cache_file
+        cache_file_path=args.cache_file,
+        selected_set=selected_set
     )
 
 if __name__ == "__main__":

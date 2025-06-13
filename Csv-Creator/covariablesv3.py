@@ -69,8 +69,8 @@ def compute_solar_radiation_from_wc_range(df: pd.DataFrame) -> pd.DataFrame:
         lat = row['latitude']
         lon = row['longitude']
         try:
-            start = pd.to_datetime(row['start'])
-            end = pd.to_datetime(row['end'])
+            start = pd.to_datetime(row['start'], dayfirst=True)
+            end = pd.to_datetime(row['end'], dayfirst=True)
             if pd.isna(start) or pd.isna(end):
                 continue
         except Exception:
@@ -117,7 +117,7 @@ def compute_solar_radiation_from_wc_range(df: pd.DataFrame) -> pd.DataFrame:
                 'Har_SolarRad_Mean': avg_rs
             })
     
-    print(f"Computed solar radiation for {len(output_rows)} location-years.")
+    # print(f"Computed solar radiation for {len(output_rows)} location-years.")
     return pd.DataFrame(output_rows)
 
 
@@ -317,6 +317,7 @@ def extract_era5_covariates(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(all_results)
 
 
+
 def extract_era5_totprec(df: pd.DataFrame) -> pd.DataFrame:
     pattern = re.compile(r"era5_totprec_(\d{4})-(\d{2})-(\d{2})")
     matching_columns = [col for col in df.columns if pattern.match(col)]
@@ -391,13 +392,31 @@ def extract_era5_temp_precip_covariates(df: pd.DataFrame) -> pd.DataFrame:
             continue
 
         # Annual temperature stats
-        temp_stats = df_merged.groupby(['Year']).apply(lambda x: pd.Series({
-            "ERA5_Temp_Mean": ((x['Tmax'] + x['Tmin']) / 2).mean(),
-            "ERA5_Mean_Diu_Rng": (x['Tmax'] - x['Tmin']).mean(),
-            "ERA5_Temp_Max_HotMon": x.groupby(x['Month'])['Tmax'].mean().max(),
-            "ERA5_Temp_Min_ColdMon": x.groupby(x['Month'])['Tmin'].mean().min(),
-            "ERA5_Temp_Rng": x['Tmax'].max() - x['Tmin'].min()
-        })).reset_index()
+        # Compute monthly Tmax/Tmin means for hot/cold month stats
+        monthly_stats = df_merged.groupby(['Year', 'Month']).agg({
+            'Tmax': 'mean',
+            'Tmin': 'mean'
+        }).reset_index()
+
+        # Now aggregate per year:
+        year_stats = []
+        for year, group in df_merged.groupby('Year'):
+            mask = (monthly_stats['Year'] == year)
+            hottest_month = monthly_stats[mask]['Tmax'].max()
+            coldest_month = monthly_stats[mask]['Tmin'].min()
+            temp_mean = ((group['Tmax'] + group['Tmin']) / 2).mean()
+            mean_diu_rng = (group['Tmax'] - group['Tmin']).mean()
+            temp_rng = group['Tmax'].max() - group['Tmin'].min()
+            year_stats.append({
+                'Year': year,
+                "ERA5_Temp_Mean": temp_mean,
+                "ERA5_Mean_Diu_Rng": mean_diu_rng,
+                "ERA5_Temp_Max_HotMon": hottest_month,
+                "ERA5_Temp_Min_ColdMon": coldest_month,
+                "ERA5_Temp_Rng": temp_rng
+            })
+        temp_stats = pd.DataFrame(year_stats)
+
 
         # Quarterly aggregation
         results = []
@@ -451,6 +470,71 @@ def extract_era5_temp_precip_covariates(df: pd.DataFrame) -> pd.DataFrame:
     return pd.concat(all_results, ignore_index=True) if all_results else pd.DataFrame()
 
 
+def extract_biovars_from_tc_and_chirps(df, tc_vars=['tmax', 'tmin'], chirps_prefix='chirps_chirps_'):
+    all_results = []
+
+    # --- Gather TC tmax/tmin columns ---
+    tc_col_map = {}
+    for var in tc_vars:
+        tc_col_map[var] = [col for col in df.columns if re.match(rf"tc_{var}_(\d{{4}})-(\d{{2}})", col)]
+
+    # --- Gather all daily CHIRPS columns ---
+    chirps_day_cols = [col for col in df.columns if re.match(rf"{chirps_prefix}\d{{4}}-\d{{2}}-\d{{2}}", col)]
+
+    for idx, row in tqdm(df.iterrows(), total=len(df), desc="BIOVARS from TC + CHIRPS"):
+        lat, lon = row['latitude'], row['longitude']
+
+        # Aggregate CHIRPS daily data to monthly sums for this row
+        chirps_monthly = {}
+        if chirps_day_cols:
+            dates_vals = [
+                (pd.to_datetime(col.replace(chirps_prefix, ""), format="%Y-%m-%d"),
+                 pd.to_numeric(row[col], errors='coerce'))
+                for col in chirps_day_cols if not pd.isna(row[col])
+            ]
+            if dates_vals:
+                chirps_mo_df = pd.DataFrame(dates_vals, columns=['date', 'prec'])
+                chirps_mo_df['year'] = chirps_mo_df['date'].dt.year
+                chirps_mo_df['month'] = chirps_mo_df['date'].dt.month
+                grouped = chirps_mo_df.groupby(['year', 'month'])['prec'].sum().reset_index()
+                chirps_monthly = {(int(y), int(m)): v for y, m, v in grouped.itertuples(index=False)}
+
+        # Gather TC tmax/tmin monthly for this row
+        tc_monthly = {}
+        for var in tc_vars:
+            for col in tc_col_map[var]:
+                m = re.search(r"tc_(\w+)_(\d{4})-(\d{2})", col)
+                if m:
+                    year, month = int(m.group(2)), int(m.group(3))
+                    val = pd.to_numeric(row[col], errors='coerce')
+                    tc_monthly.setdefault((year, month), {})[var] = val
+
+        # For years where we have all 12 months of tmax, tmin (TC) and CHIRPS precip
+        all_years = set(y for (y, m) in chirps_monthly.keys()) & set(y for (y, m) in tc_monthly.keys())
+
+        for year in sorted(all_years):
+            tmax_vals = np.array([tc_monthly.get((year, m), {}).get('tmax', np.nan) for m in range(1, 13)])
+            tmin_vals = np.array([tc_monthly.get((year, m), {}).get('tmin', np.nan) for m in range(1, 13)])
+            prec_vals = np.array([chirps_monthly.get((year, m), np.nan) for m in range(1, 13)])
+
+            # Require at least 10 months of data for each
+            valid_mask = lambda arr: np.count_nonzero(~np.isnan(arr)) >= 10
+            if all(valid_mask(arr) for arr in [tmax_vals, tmin_vals, prec_vals]):
+                try:
+                    bio = compute_biovars(prec_vals, tmin_vals, tmax_vals)
+                    bio_result = {
+                        'latitude': lat,
+                        'longitude': lon,
+                        'year': year
+                    }
+                    bio_result.update({f"TC_CHIRPS_BIO_{idx+1}": val for idx, val in enumerate(bio)})
+                    all_results.append(bio_result)
+                except Exception as e:
+                    print(f"[BIOVARS ERROR] lat={lat} lon={lon} year={year} — {e}")
+
+    return pd.DataFrame(all_results)
+
+
 def extract_monthly_covariates(df: pd.DataFrame, source: str, variables: list, prefix: str) -> pd.DataFrame:
     all_results = []
     data_by_var = {}
@@ -464,15 +548,9 @@ def extract_monthly_covariates(df: pd.DataFrame, source: str, variables: list, p
         else:
             print(f"No columns found for {source}/{var}")
 
+
     for idx, row in tqdm(df.iterrows(), total=len(df), desc=f"Processing {source.upper()} covariates"):
         lat, lon = row['latitude'], row['longitude']
-
-        # --- For wc/biovar: load full tmax, tmin, prec if present ---
-        tmax_cols, tmin_cols, prec_cols = [], [], []
-        if source == 'wc':
-            tmax_cols = data_by_var.get('tmax', [])
-            tmin_cols = data_by_var.get('tmin', [])
-            prec_cols = data_by_var.get('prec', [])
 
         # --- Seasonal stats for each variable ---
         for var, matching_columns in data_by_var.items():
@@ -521,45 +599,6 @@ def extract_monthly_covariates(df: pd.DataFrame, source: str, variables: list, p
                         f"{prefix}_{var}_Mean_year": row_ann['Value']
                     })
 
-        # --- Biovars ---
-        if source == 'wc' and all([tmax_cols, tmin_cols, prec_cols]):
-            regex = re.compile(r"(\d{4})-(\d{2})")
-
-            # --- Extract all (year, month) and values for each variable ---
-            def extract_var_map(var_cols):
-                val_map = {}
-                for col in var_cols:
-                    match = regex.search(col)
-                    if match:
-                        y, m = int(match.group(1)), int(match.group(2))
-                        val_map.setdefault(y, {})[m] = pd.to_numeric(row.get(col), errors='coerce')
-                return val_map
-
-            tmax_map = extract_var_map(tmax_cols)
-            tmin_map = extract_var_map(tmin_cols)
-            prec_map = extract_var_map(prec_cols)
-
-            # --- Compute biovars per year ---
-            years = set(tmax_map.keys()) & set(tmin_map.keys()) & set(prec_map.keys())
-            for year in sorted(years):
-                try:
-                    tmax_vals = np.array([tmax_map[year].get(m, np.nan) for m in range(1, 13)])
-                    tmin_vals = np.array([tmin_map[year].get(m, np.nan) for m in range(1, 13)])
-                    prec_vals = np.array([prec_map[year].get(m, np.nan) for m in range(1, 13)])
-
-                    valid_mask = lambda arr: np.count_nonzero(~np.isnan(arr)) >= 10
-                    if all(valid_mask(arr) for arr in [tmax_vals, tmin_vals, prec_vals]):
-                        bio = compute_biovars(prec_vals, tmin_vals, tmax_vals)
-                        bio_result = {
-                            'latitude': lat,
-                            'longitude': lon,
-                            'year': year
-                        }
-                        bio_result.update({f"WC_bio{idx+1}": val for idx, val in enumerate(bio)})
-                        all_results.append(bio_result)
-                except Exception as e:
-                    print(f"[BIOVARS ERROR] lat={lat} lon={lon} year={year} — {e}")
-
     return pd.DataFrame(all_results)
 
 
@@ -598,8 +637,9 @@ def main():
     era5_rest_df = extract_era5_covariates(df)
     era5_quartile = extract_era5_temp_precip_covariates(df)
     SolarRad = compute_solar_radiation_from_wc_range(df)
+    bio_df = extract_biovars_from_tc_and_chirps(df)
 
-    dynamic_dfs = [chirps_df, et_df, wc_df, spei_df, tc_df, np_df, era5_p_df, era5_rest_df, era5_quartile, SolarRad]
+    dynamic_dfs = [chirps_df, et_df, wc_df, spei_df, tc_df, np_df, era5_p_df, era5_rest_df, era5_quartile, SolarRad, bio_df]
     for i, d in enumerate(dynamic_dfs):
         if d is not None and not d.empty:
             dynamic_dfs[i] = d.groupby(['latitude', 'longitude', 'year']).first().reset_index()
