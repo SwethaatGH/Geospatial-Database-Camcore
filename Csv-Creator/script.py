@@ -179,7 +179,7 @@ async def process_csv_file(
     default_end_date=None,
     cache_file_path="climate_data_cache.json",
     selected_set=None,
-    max_concurrent=20
+    max_concurrent=50
 ):
     cache = load_cache(cache_file_path)
     df = pd.read_csv(input_csv_path)
