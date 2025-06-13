@@ -5,6 +5,8 @@ import asyncio
 import sys
 from tqdm import tqdm
 from dateutil.parser import parse as try_parse_date
+from collections import defaultdict
+import glob
 
 # Add virtual environment site-packages to path
 venv_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Api-v1", "venv"))
@@ -14,6 +16,8 @@ else:
     site_packages = os.path.join(venv_path, "lib", "python3.9", "site-packages")
 if os.path.exists(site_packages):
     sys.path.insert(0, site_packages)
+
+os.makedirs('batches', exist_ok=True)
 
 # Add API source path
 api_v1_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Api-v1"))
@@ -72,11 +76,7 @@ DATA_SOURCES = {
     "np": ["airmass", "allsky_kt", "allsky_nkt", "allsky_sfc_lw_dwn", "allsky_sfc_lw_up", "allsky_sfc_par_diff",
            "allsky_sfc_par_dirh", "allsky_sfc_par_tot", "allsky_sfc_sw_diff", "allsky_sfc_sw_dirh", "allsky_sfc_sw_dni",
            "allsky_sfc_sw_dwn", "allsky_sfc_sw_up", "allsky_sfc_uv_index", "allsky_sfc_uva", "allsky_sfc_uvb",
-           "allsky_srf_alb", "aod_55", "aod_55_adj", "aod_84", "cloud_amt", "cloud_amt_day", "cloud_amt_night",
-           "cloud_od", "clrsky_days", "clrsky_kt", "clrsky_nkt", "clrsky_sfc_lw_dwn", "clrsky_sfc_lw_up",
-           "clrsky_sfc_par_diff", "clrsky_sfc_par_dirh", "clrsky_sfc_par_tot", "clrsky_sfc_sw_diff",
-           "clrsky_sfc_sw_dirh", "clrsky_sfc_sw_dni", "clrsky_sfc_sw_dwn", "clrsky_sfc_sw_up", "clrsky_srf_alb",
-           "midday_insol", "original_allsky_sfc_sw_diff", "original_allsky_sfc_sw_dirh", "psh", "pw",
+           "allsky_srf_alb", "midday_insol", "original_allsky_sfc_sw_diff", "original_allsky_sfc_sw_dirh", "psh", "pw",
            "srf_alb_adj", "toa_sw_dni", "toa_sw_dwn", "ts_adj"],
     "era5": ["evaptrans", "latheat", "netsolrad", "press", "sktemp", "sotemp1", "sotemp2", "sotemp3", "temp",
              "totprec", "uwind", "vwind", "volsowat1", "volsowat12", "volsowat13"],
@@ -101,7 +101,13 @@ def load_cache(cache_file_path):
         return {}
 
 async def query_climate_data(lat, lon, start_date, end_date, data_source, variable=None, cache=None):
-    cache_key = f"{lat}_{lon}_{start_date}_{end_date}_{data_source}_{variable}"
+
+    variable_key = (
+        ','.join(variable) if isinstance(variable, list) else str(variable)
+        if variable is not None else "None"
+    )
+
+    cache_key = f"{lat}_{lon}_{start_date}_{end_date}_{data_source}_{variable_key}"
     cache_hash = hashlib.md5(cache_key.encode()).hexdigest()
     if cache and cache_hash in cache:
         return cache[cache_hash]
@@ -123,6 +129,13 @@ async def query_climate_data(lat, lon, start_date, end_date, data_source, variab
         cache[cache_hash] = result
     return result
 
+def group_selected_vars_by_source(selected_set):
+    by_source = defaultdict(list)
+    for key in selected_set:
+        src, var = key.split(':', 1)
+        by_source[src].append(var)
+    return by_source
+
 async def process_one_row(
     row,
     index,
@@ -130,46 +143,47 @@ async def process_one_row(
     end_col,
     selected_set,
     cache,
-    semaphore):
-    # Await on the semaphore to limit concurrency
+    semaphore
+):
     async with semaphore:
         lat = row['latitude']
         lon = row['longitude']
 
         start_date_raw = row.get(start_col)
         end_date_raw = row.get(end_col)
-
         start_date = convert_date_format(start_date_raw)
         end_date = convert_date_format(end_date_raw)
 
         row_updates = {}
 
-        for source, variables in DATA_SOURCES.items():
-            for var in variables:
-                if f"{source}:{var}" not in selected_set:
-                    continue
-                data = await query_climate_data(lat, lon, start_date, end_date, source, var, cache)
-                if not data or 'data' not in data:
-                    continue
+        # GROUP selected variables by data source
+        vars_by_source = group_selected_vars_by_source(selected_set)
 
-                for entry in data['data']:
-                    if source in STATIC_SOURCES:
-                        key = f"{source}_{entry['variable']}"
-                        row_updates[key] = entry['value']
-                    else:
-                        date_str = entry.get("date") or f"{entry['year']}-{entry['month']:02d}"
-                        for v, val in entry.get("values", {}).items():
-                            key = f"{source}_{v}_{date_str}"
+        for source, variables in vars_by_source.items():
+            # Pass all variables for the source in a single call
+            data = await query_climate_data(
+                lat, lon, start_date, end_date, source, variables, cache
+            )
+            if not data or 'data' not in data:
+                continue
 
-                            # Convert ERA5 temperature variables from Kelvin to Celsius
-                            if source == "era5" and v in {"sktemp", "sotemp1", "sotemp2", "sotemp3", "temp"}:
-                                val = val - 273.15
-                            if source == 'era5' and v in {"totprec"}:
-                                val = val * 1000
+            for entry in data['data']:
+                if source in STATIC_SOURCES:
+                    # Static: one value per variable
+                    key = f"{source}_{entry['variable']}"
+                    row_updates[key] = entry['value']
+                else:
+                    # Time series: values per date
+                    date_str = entry.get("date") or f"{entry['year']}-{entry['month']:02d}"
+                    for v, val in entry.get("values", {}).items():
+                        key = f"{source}_{v}_{date_str}"
+                        # Convert ERA5 units if needed
+                        if source == "era5" and v in {"sktemp", "sotemp1", "sotemp2", "sotemp3", "temp"}:
+                            val = val - 273.15
+                        if source == 'era5' and v in {"totprec"}:
+                            val = val * 1000
+                        row_updates[key] = val
 
-                            row_updates[key] = val
-
-        # Return updates for this row
         return (index, row_updates)
 
 async def process_csv_file(
@@ -179,16 +193,20 @@ async def process_csv_file(
     default_end_date=None,
     cache_file_path="climate_data_cache.json",
     selected_set=None,
-    max_concurrent=60
+    max_concurrent=60,
+    checkpoint_size=250,      # <--- rows per output file
+    checkpoint_prefix="batches/results_batch_"
 ):
+    import math
     cache = load_cache(cache_file_path)
     df = pd.read_csv(input_csv_path)
     results_df = df.copy()
-
-    # Detect date columns once
     start_col, end_col = detect_date_columns(df)
-
     semaphore = asyncio.Semaphore(max_concurrent)
+
+    batch_updates = []
+    batch_indices = []
+    batch_number = 0
 
     tasks = [
         process_one_row(
@@ -203,31 +221,57 @@ async def process_csv_file(
         for idx, row in df.iterrows()
     ]
 
-    # tqdm for concurrent tasks: wrap with asyncio.as_completed
     updates = []
-    for f in tqdm(asyncio.as_completed(tasks), total=len(tasks), desc="Processing rows"):
+    for i, f in enumerate(tqdm(asyncio.as_completed(tasks), total=len(tasks), desc="Processing rows")):
         result = await f
         updates.append(result)
+        batch_updates.append(result)
+        batch_indices.append(result[0])
 
-    # --- New efficient merging block ---
-    indices = []
-    updates_dicts = []
-    for idx, row_updates in updates:
-        indices.append(idx)
-        updates_dicts.append(row_updates)
+        # Every checkpoint_size rows, write a checkpoint CSV
+        if (i + 1) % checkpoint_size == 0:
+            indices = []
+            updates_dicts = []
+            for idx, row_updates in batch_updates:
+                indices.append(idx)
+                updates_dicts.append(row_updates)
+            updates_df = pd.DataFrame(updates_dicts, index=indices)
+            file_name = f"{checkpoint_prefix}{batch_number}.csv"
+            # Only output the batch
+            batch_df = pd.concat([results_df.iloc[indices], updates_df], axis=1)
+            batch_df = batch_df.copy()
+            batch_df.to_csv(file_name, index=False)
+            print(f"✅ Saved checkpoint {file_name} ({i+1} rows)")
+            batch_updates = []
+            batch_indices = []
+            batch_number += 1
 
-    # Create a DataFrame from the row_updates dicts, aligned to row indices
-    updates_df = pd.DataFrame(updates_dicts, index=indices)
+    # Write any remaining rows
+    if batch_updates:
+        indices = []
+        updates_dicts = []
+        for idx, row_updates in batch_updates:
+            indices.append(idx)
+            updates_dicts.append(row_updates)
+        updates_df = pd.DataFrame(updates_dicts, index=indices)
+        file_name = f"{checkpoint_prefix}{batch_number}.csv"
+        batch_df = pd.concat([results_df.iloc[indices], updates_df], axis=1)
+        batch_df = batch_df.copy()
+        batch_df.to_csv(file_name, index=False)
+        print(f"✅ Saved checkpoint {file_name} (final batch)")
 
-    # Concat with original DataFrame (aligns by index, adds all new columns at once)
-    final_df = pd.concat([results_df, updates_df], axis=1)
-
-    # Defragment DataFrame for max write speed
-    final_df = final_df.copy()
-
+    # Optionally, merge or postprocess batches after
     save_cache(cache, cache_file_path)
-    final_df.to_csv(output_csv_path, index=False)
-    print(f"✅ Saved output to {output_csv_path}")
+    print(f"✅ Checkpointing complete.")
+
+    batch_pattern = f"{checkpoint_prefix}*.csv" if checkpoint_prefix.endswith('_') else f"{checkpoint_prefix}_*.csv"
+    batch_files = sorted(
+        glob.glob(batch_pattern),
+        key=lambda x: int(x.split('_')[-1].split('.')[0])
+    )
+    merged_df = pd.concat([pd.read_csv(f) for f in batch_files], ignore_index=True)
+    merged_df.to_csv(output_csv_path, index=False)
+    print(f"✅ Merged all batch files to {output_csv_path}")
 
 
 
