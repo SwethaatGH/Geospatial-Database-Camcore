@@ -194,8 +194,8 @@ async def process_csv_file(
     default_end_date=None,
     cache_file_path="climate_data_cache.json",
     selected_set=None,
-    max_concurrent=60,
-    checkpoint_size=15,      # <--- rows per output file
+    max_concurrent=100,
+    checkpoint_size=1000,      # <--- rows per output file
     checkpoint_prefix="batches/results_batch_",
     covariate_prefix="batches/covariates_batch"
 
