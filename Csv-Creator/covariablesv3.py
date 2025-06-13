@@ -641,7 +641,14 @@ def main():
             dynamic_dfs[i] = d.groupby(['latitude', 'longitude', 'year']).first().reset_index()
 
     from functools import reduce
-    merged_df = reduce(lambda left, right: pd.merge(left, right, on=['latitude', 'longitude', 'year'], how='outer'), [d for d in dynamic_dfs if not d.empty])
+    dynamic_dfs_valid = [d for d in dynamic_dfs if not d.empty]
+    if dynamic_dfs_valid:
+        merged_df = reduce(
+            lambda left, right: pd.merge(left, right, on=['latitude', 'longitude', 'year'], how='outer'),
+            dynamic_dfs_valid
+        )
+    else:
+        merged_df = pd.DataFrame() 
 
     # Merge static columns after
     if not static_df.empty and not merged_df.empty:
