@@ -6,6 +6,7 @@ import sys
 from tqdm import tqdm
 from dateutil.parser import parse as try_parse_date
 from collections import defaultdict
+import glob
 
 # Add virtual environment site-packages to path
 venv_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Api-v1", "venv"))
@@ -15,6 +16,8 @@ else:
     site_packages = os.path.join(venv_path, "lib", "python3.9", "site-packages")
 if os.path.exists(site_packages):
     sys.path.insert(0, site_packages)
+
+os.makedirs('batches', exist_ok=True)
 
 # Add API source path
 api_v1_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Api-v1"))
@@ -190,9 +193,9 @@ async def process_csv_file(
     default_end_date=None,
     cache_file_path="climate_data_cache.json",
     selected_set=None,
-    max_concurrent=50,
-    checkpoint_size=1000,      # <--- rows per output file
-    checkpoint_prefix="results_batch_"
+    max_concurrent=60,
+    checkpoint_size=250,      # <--- rows per output file
+    checkpoint_prefix="batches/results_batch_"
 ):
     import math
     cache = load_cache(cache_file_path)
@@ -260,6 +263,15 @@ async def process_csv_file(
     # Optionally, merge or postprocess batches after
     save_cache(cache, cache_file_path)
     print(f"✅ Checkpointing complete.")
+
+    batch_pattern = f"{checkpoint_prefix}*.csv" if checkpoint_prefix.endswith('_') else f"{checkpoint_prefix}_*.csv"
+    batch_files = sorted(
+        glob.glob(batch_pattern),
+        key=lambda x: int(x.split('_')[-1].split('.')[0])
+    )
+    merged_df = pd.concat([pd.read_csv(f) for f in batch_files], ignore_index=True)
+    merged_df.to_csv(output_csv_path, index=False)
+    print(f"✅ Merged all batch files to {output_csv_path}")
 
 
 
