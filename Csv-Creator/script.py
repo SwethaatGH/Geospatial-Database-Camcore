@@ -190,16 +190,20 @@ async def process_csv_file(
     default_end_date=None,
     cache_file_path="climate_data_cache.json",
     selected_set=None,
-    max_concurrent=50
+    max_concurrent=50,
+    checkpoint_size=1000,      # <--- rows per output file
+    checkpoint_prefix="results_batch_"
 ):
+    import math
     cache = load_cache(cache_file_path)
     df = pd.read_csv(input_csv_path)
     results_df = df.copy()
-
-    # Detect date columns once
     start_col, end_col = detect_date_columns(df)
-
     semaphore = asyncio.Semaphore(max_concurrent)
+
+    batch_updates = []
+    batch_indices = []
+    batch_number = 0
 
     tasks = [
         process_one_row(
@@ -214,31 +218,48 @@ async def process_csv_file(
         for idx, row in df.iterrows()
     ]
 
-    # tqdm for concurrent tasks: wrap with asyncio.as_completed
     updates = []
-    for f in tqdm(asyncio.as_completed(tasks), total=len(tasks), desc="Processing rows"):
+    for i, f in enumerate(tqdm(asyncio.as_completed(tasks), total=len(tasks), desc="Processing rows")):
         result = await f
         updates.append(result)
+        batch_updates.append(result)
+        batch_indices.append(result[0])
 
-    # --- New efficient merging block ---
-    indices = []
-    updates_dicts = []
-    for idx, row_updates in updates:
-        indices.append(idx)
-        updates_dicts.append(row_updates)
+        # Every checkpoint_size rows, write a checkpoint CSV
+        if (i + 1) % checkpoint_size == 0:
+            indices = []
+            updates_dicts = []
+            for idx, row_updates in batch_updates:
+                indices.append(idx)
+                updates_dicts.append(row_updates)
+            updates_df = pd.DataFrame(updates_dicts, index=indices)
+            file_name = f"{checkpoint_prefix}{batch_number}.csv"
+            # Only output the batch
+            batch_df = pd.concat([results_df.iloc[indices], updates_df], axis=1)
+            batch_df = batch_df.copy()
+            batch_df.to_csv(file_name, index=False)
+            print(f"✅ Saved checkpoint {file_name} ({i+1} rows)")
+            batch_updates = []
+            batch_indices = []
+            batch_number += 1
 
-    # Create a DataFrame from the row_updates dicts, aligned to row indices
-    updates_df = pd.DataFrame(updates_dicts, index=indices)
+    # Write any remaining rows
+    if batch_updates:
+        indices = []
+        updates_dicts = []
+        for idx, row_updates in batch_updates:
+            indices.append(idx)
+            updates_dicts.append(row_updates)
+        updates_df = pd.DataFrame(updates_dicts, index=indices)
+        file_name = f"{checkpoint_prefix}{batch_number}.csv"
+        batch_df = pd.concat([results_df.iloc[indices], updates_df], axis=1)
+        batch_df = batch_df.copy()
+        batch_df.to_csv(file_name, index=False)
+        print(f"✅ Saved checkpoint {file_name} (final batch)")
 
-    # Concat with original DataFrame (aligns by index, adds all new columns at once)
-    final_df = pd.concat([results_df, updates_df], axis=1)
-
-    # Defragment DataFrame for max write speed
-    final_df = final_df.copy()
-
+    # Optionally, merge or postprocess batches after
     save_cache(cache, cache_file_path)
-    final_df.to_csv(output_csv_path, index=False)
-    print(f"✅ Saved output to {output_csv_path}")
+    print(f"✅ Checkpointing complete.")
 
 
 
