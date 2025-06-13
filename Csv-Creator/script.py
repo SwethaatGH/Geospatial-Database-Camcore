@@ -3,6 +3,7 @@ from datetime import datetime
 import time, json, argparse, hashlib, os
 import asyncio
 import sys
+import subprocess
 from tqdm import tqdm
 from dateutil.parser import parse as try_parse_date
 from collections import defaultdict
@@ -194,8 +195,10 @@ async def process_csv_file(
     cache_file_path="climate_data_cache.json",
     selected_set=None,
     max_concurrent=60,
-    checkpoint_size=250,      # <--- rows per output file
-    checkpoint_prefix="batches/results_batch_"
+    checkpoint_size=15,      # <--- rows per output file
+    checkpoint_prefix="batches/results_batch_",
+    covariate_prefix="batches/covariates_batch"
+
 ):
     import math
     cache = load_cache(cache_file_path)
@@ -242,6 +245,14 @@ async def process_csv_file(
             batch_df = batch_df.copy()
             batch_df.to_csv(file_name, index=False)
             print(f"✅ Saved checkpoint {file_name} ({i+1} rows)")
+
+            cov_file = file_name.replace("results_batch_", "covariates_batch_")
+            subprocess.run([
+                sys.executable, "../Csv-Creator/covariablesv3.py",
+                "--input", file_name,
+                "--output", cov_file
+            ], check=True)
+
             batch_updates = []
             batch_indices = []
             batch_number += 1
@@ -260,18 +271,22 @@ async def process_csv_file(
         batch_df.to_csv(file_name, index=False)
         print(f"✅ Saved checkpoint {file_name} (final batch)")
 
-    # Optionally, merge or postprocess batches after
-    save_cache(cache, cache_file_path)
-    print(f"✅ Checkpointing complete.")
+        cov_file = file_name.replace("results_batch_", "covariates_batch_")
+        subprocess.run([
+            sys.executable, "covariablesv3.py",
+            "--input", file_name,
+            "--output", cov_file
+        ], check=True)
 
-    batch_pattern = f"{checkpoint_prefix}*.csv" if checkpoint_prefix.endswith('_') else f"{checkpoint_prefix}_*.csv"
+
+    batch_pattern = f"{covariate_prefix}*.csv" if covariate_prefix.endswith('_') else f"{covariate_prefix}_*.csv"
     batch_files = sorted(
         glob.glob(batch_pattern),
         key=lambda x: int(x.split('_')[-1].split('.')[0])
     )
     merged_df = pd.concat([pd.read_csv(f) for f in batch_files], ignore_index=True)
     merged_df.to_csv(output_csv_path, index=False)
-    print(f"✅ Merged all batch files to {output_csv_path}")
+    print(f"✅ Merged all covariate files to {output_csv_path}")
 
 
 

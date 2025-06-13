@@ -174,31 +174,35 @@ async def process_csv(
     covariates_path = processed_dir / f"covariates_{file.filename}"
 
     try:
+        # Always run script.py (it will now batch and merge covariates inside itself!)
         subprocess.run([
             sys.executable, "../Csv-Creator/script.py",
             "--input", str(file_path),
-            "--output", str(raw_data_path),
+            "--output", str(raw_data_path),        # <-- merged/merged raw or just last batch
             "--default-start-date", "2000-01-01",
             "--default-end-date", "2000-12-31",
             "--cache-file", f"{processed_dir}/cache.json",
             "--vars", variables 
         ], check=True)
 
-        if option == "full":
-            subprocess.run([
-                sys.executable, "../Csv-Creator/covariablesv3.py",
-                "--input", str(raw_data_path),
-                "--output", str(covariates_path)
-            ], check=True)
-
-        return {
+        # Now: Don't run covariablesv3.py here; it's handled inside script.py per batch!
+        # Just return the correct files
+        resp = {
             "message": "Processing complete.",
             "jobId": job_id,
+            # this could be the merged file, or the batches (see below)
             "rawDataFile": f"/download/{job_id}/raw_data_{file.filename}",
-            "covariatesFile": f"/download/{job_id}/covariates_{file.filename}" if option == "full" else None
         }
+        if option == "full":
+            # merged covariates already created by script.py
+            resp["covariatesFile"] = f"/download/{job_id}/covariates_{file.filename}"
+        else:
+            resp["covariatesFile"] = None
+        return resp
+
     except subprocess.CalledProcessError as e:
         raise HTTPException(status_code=500, detail=f"Processing error: {e}")
+
 
 @app.get("/download/{job_id}/{filename}")
 async def download_file(job_id: str, filename: str):
