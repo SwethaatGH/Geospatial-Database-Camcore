@@ -22,7 +22,7 @@ async def get_climate_data_timeseries_logic(
     start_date: Optional[str],
     end_date: Optional[str],
     data_source: DataSource,
-    variable: Optional[str],
+    variable: Optional[object],  # Accept list, str, or None
     db
 ) -> dict:
     result = {
@@ -47,11 +47,13 @@ async def get_climate_data_timeseries_logic(
 
     try:
         if data_source in STATIC_DATA_SOURCES:
+            # --- Static case ---
             if variable:
-                # Only query for the single requested variable
+                # If variable is list, batch all; else do as before
+                variables = variable if isinstance(variable, list) else [variable]
                 query = text(f"""
                     SELECT 
-                        MAX(CASE WHEN var_name = :variable THEN point_value END) AS value
+                        {", ".join([f"MAX(CASE WHEN var_name = :var_{i} THEN point_value END) AS var_{i}" for i in range(len(variables))])}
                     FROM (
                         SELECT 
                             var_name,
@@ -60,15 +62,19 @@ async def get_climate_data_timeseries_logic(
                             {table_name}
                         WHERE 
                             ST_Intersects(rast, {point_wkt})
-                            AND var_name = :variable
+                            AND var_name IN ({', '.join([f':var_{i}' for i in range(len(variables))])})
                     ) sub
                 """)
-                row = (await db.execute(query, {"variable": variable})).mappings().first()
-                if row and row["value"] is not None:
-                    result["data"] = [{"variable": variable, "value": row["value"]}]
+                query_args = {f"var_{i}": v for i, v in enumerate(variables)}
+                row = (await db.execute(query, query_args)).mappings().first()
+                if row:
+                    result["data"] = [
+                        {"variable": variables[i], "value": row[f"var_{i}"]}
+                        for i in range(len(variables)) if row[f"var_{i}"] is not None
+                    ]
                 return result
             else:
-                # Fetch all available variables
+                # All variables for this source
                 variables = AVAILABLE_VARIABLES.get(data_source, [])
                 query = text(f"""
                     SELECT 
@@ -88,10 +94,13 @@ async def get_climate_data_timeseries_logic(
                 result["data"] = [{"variable": var, "value": row[var]} for var in variables if row[var] is not None]
                 return result
 
-
-
         elif data_source in DATASOURCES_WITH_VARIABLES:
-            variables = [variable] if variable else AVAILABLE_VARIABLES.get(data_source, [])
+            # --- Time series/batched variables ---
+            variables = []
+            if variable:
+                variables = variable if isinstance(variable, list) else [variable]
+            else:
+                variables = AVAILABLE_VARIABLES.get(data_source, [])
             var_list = ', '.join([f"'{v}'" for v in variables])
             query = text(f"""
                 SELECT 

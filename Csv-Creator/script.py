@@ -5,6 +5,7 @@ import asyncio
 import sys
 from tqdm import tqdm
 from dateutil.parser import parse as try_parse_date
+from collections import defaultdict
 
 # Add virtual environment site-packages to path
 venv_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Api-v1", "venv"))
@@ -72,11 +73,7 @@ DATA_SOURCES = {
     "np": ["airmass", "allsky_kt", "allsky_nkt", "allsky_sfc_lw_dwn", "allsky_sfc_lw_up", "allsky_sfc_par_diff",
            "allsky_sfc_par_dirh", "allsky_sfc_par_tot", "allsky_sfc_sw_diff", "allsky_sfc_sw_dirh", "allsky_sfc_sw_dni",
            "allsky_sfc_sw_dwn", "allsky_sfc_sw_up", "allsky_sfc_uv_index", "allsky_sfc_uva", "allsky_sfc_uvb",
-           "allsky_srf_alb", "aod_55", "aod_55_adj", "aod_84", "cloud_amt", "cloud_amt_day", "cloud_amt_night",
-           "cloud_od", "clrsky_days", "clrsky_kt", "clrsky_nkt", "clrsky_sfc_lw_dwn", "clrsky_sfc_lw_up",
-           "clrsky_sfc_par_diff", "clrsky_sfc_par_dirh", "clrsky_sfc_par_tot", "clrsky_sfc_sw_diff",
-           "clrsky_sfc_sw_dirh", "clrsky_sfc_sw_dni", "clrsky_sfc_sw_dwn", "clrsky_sfc_sw_up", "clrsky_srf_alb",
-           "midday_insol", "original_allsky_sfc_sw_diff", "original_allsky_sfc_sw_dirh", "psh", "pw",
+           "allsky_srf_alb", "midday_insol", "original_allsky_sfc_sw_diff", "original_allsky_sfc_sw_dirh", "psh", "pw",
            "srf_alb_adj", "toa_sw_dni", "toa_sw_dwn", "ts_adj"],
     "era5": ["evaptrans", "latheat", "netsolrad", "press", "sktemp", "sotemp1", "sotemp2", "sotemp3", "temp",
              "totprec", "uwind", "vwind", "volsowat1", "volsowat12", "volsowat13"],
@@ -101,7 +98,13 @@ def load_cache(cache_file_path):
         return {}
 
 async def query_climate_data(lat, lon, start_date, end_date, data_source, variable=None, cache=None):
-    cache_key = f"{lat}_{lon}_{start_date}_{end_date}_{data_source}_{variable}"
+
+    variable_key = (
+        ','.join(variable) if isinstance(variable, list) else str(variable)
+        if variable is not None else "None"
+    )
+
+    cache_key = f"{lat}_{lon}_{start_date}_{end_date}_{data_source}_{variable_key}"
     cache_hash = hashlib.md5(cache_key.encode()).hexdigest()
     if cache and cache_hash in cache:
         return cache[cache_hash]
@@ -123,6 +126,13 @@ async def query_climate_data(lat, lon, start_date, end_date, data_source, variab
         cache[cache_hash] = result
     return result
 
+def group_selected_vars_by_source(selected_set):
+    by_source = defaultdict(list)
+    for key in selected_set:
+        src, var = key.split(':', 1)
+        by_source[src].append(var)
+    return by_source
+
 async def process_one_row(
     row,
     index,
@@ -130,46 +140,47 @@ async def process_one_row(
     end_col,
     selected_set,
     cache,
-    semaphore):
-    # Await on the semaphore to limit concurrency
+    semaphore
+):
     async with semaphore:
         lat = row['latitude']
         lon = row['longitude']
 
         start_date_raw = row.get(start_col)
         end_date_raw = row.get(end_col)
-
         start_date = convert_date_format(start_date_raw)
         end_date = convert_date_format(end_date_raw)
 
         row_updates = {}
 
-        for source, variables in DATA_SOURCES.items():
-            for var in variables:
-                if f"{source}:{var}" not in selected_set:
-                    continue
-                data = await query_climate_data(lat, lon, start_date, end_date, source, var, cache)
-                if not data or 'data' not in data:
-                    continue
+        # GROUP selected variables by data source
+        vars_by_source = group_selected_vars_by_source(selected_set)
 
-                for entry in data['data']:
-                    if source in STATIC_SOURCES:
-                        key = f"{source}_{entry['variable']}"
-                        row_updates[key] = entry['value']
-                    else:
-                        date_str = entry.get("date") or f"{entry['year']}-{entry['month']:02d}"
-                        for v, val in entry.get("values", {}).items():
-                            key = f"{source}_{v}_{date_str}"
+        for source, variables in vars_by_source.items():
+            # Pass all variables for the source in a single call
+            data = await query_climate_data(
+                lat, lon, start_date, end_date, source, variables, cache
+            )
+            if not data or 'data' not in data:
+                continue
 
-                            # Convert ERA5 temperature variables from Kelvin to Celsius
-                            if source == "era5" and v in {"sktemp", "sotemp1", "sotemp2", "sotemp3", "temp"}:
-                                val = val - 273.15
-                            if source == 'era5' and v in {"totprec"}:
-                                val = val * 1000
+            for entry in data['data']:
+                if source in STATIC_SOURCES:
+                    # Static: one value per variable
+                    key = f"{source}_{entry['variable']}"
+                    row_updates[key] = entry['value']
+                else:
+                    # Time series: values per date
+                    date_str = entry.get("date") or f"{entry['year']}-{entry['month']:02d}"
+                    for v, val in entry.get("values", {}).items():
+                        key = f"{source}_{v}_{date_str}"
+                        # Convert ERA5 units if needed
+                        if source == "era5" and v in {"sktemp", "sotemp1", "sotemp2", "sotemp3", "temp"}:
+                            val = val - 273.15
+                        if source == 'era5' and v in {"totprec"}:
+                            val = val * 1000
+                        row_updates[key] = val
 
-                            row_updates[key] = val
-
-        # Return updates for this row
         return (index, row_updates)
 
 async def process_csv_file(
