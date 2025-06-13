@@ -423,6 +423,7 @@ def extract_era5_temp_precip_covariates(df: pd.DataFrame) -> pd.DataFrame:
         for year in df_merged['Year'].unique():
             df_y = df_merged[df_merged['Year'] == year].copy()
             df_y = df_y.set_index('time')
+            df_y = df_y.sort_index()
 
             quarters = {
                 "Q1": slice(f"{year}-01-01", f"{year}-03-31"),
