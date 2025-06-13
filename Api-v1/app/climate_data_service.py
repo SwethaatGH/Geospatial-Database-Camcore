@@ -137,6 +137,8 @@ async def get_climate_data_timeseries_logic(
                 ORDER BY date_id
             """)
             rows = (await db.execute(query, {"start": start_date_obj, "end": end_date_obj})).mappings().all()
+            
+            varname = variable[0] if isinstance(variable, list) and len(variable) == 1 else variable
             for row in rows:
                 val = row[column]
                 if val is not None:
@@ -144,9 +146,10 @@ async def get_climate_data_timeseries_logic(
                         "date": row["date_id"].strftime("%Y-%m-%d"),
                         "year": row["date_id"].year,
                         "month": row["date_id"].month,
-                        "values": {variable: val}
+                        "values": {varname: val}
                     })
             return result
+
 
     except Exception as e:
         result["error"] = str(e)

@@ -423,6 +423,7 @@ def extract_era5_temp_precip_covariates(df: pd.DataFrame) -> pd.DataFrame:
         for year in df_merged['Year'].unique():
             df_y = df_merged[df_merged['Year'] == year].copy()
             df_y = df_y.set_index('time')
+            df_y = df_y.sort_index()
 
             quarters = {
                 "Q1": slice(f"{year}-01-01", f"{year}-03-31"),
@@ -641,7 +642,14 @@ def main():
             dynamic_dfs[i] = d.groupby(['latitude', 'longitude', 'year']).first().reset_index()
 
     from functools import reduce
-    merged_df = reduce(lambda left, right: pd.merge(left, right, on=['latitude', 'longitude', 'year'], how='outer'), [d for d in dynamic_dfs if not d.empty])
+    dynamic_dfs_valid = [d for d in dynamic_dfs if not d.empty]
+    if dynamic_dfs_valid:
+        merged_df = reduce(
+            lambda left, right: pd.merge(left, right, on=['latitude', 'longitude', 'year'], how='outer'),
+            dynamic_dfs_valid
+        )
+    else:
+        merged_df = pd.DataFrame() 
 
     # Merge static columns after
     if not static_df.empty and not merged_df.empty:
