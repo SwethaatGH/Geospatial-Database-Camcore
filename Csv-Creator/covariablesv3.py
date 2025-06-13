@@ -69,8 +69,8 @@ def compute_solar_radiation_from_wc_range(df: pd.DataFrame) -> pd.DataFrame:
         lat = row['latitude']
         lon = row['longitude']
         try:
-            start = pd.to_datetime(row['start'])
-            end = pd.to_datetime(row['end'])
+            start = pd.to_datetime(row['start'], dayfirst=True)
+            end = pd.to_datetime(row['end'], dayfirst=True)
             if pd.isna(start) or pd.isna(end):
                 continue
         except Exception:
@@ -117,7 +117,7 @@ def compute_solar_radiation_from_wc_range(df: pd.DataFrame) -> pd.DataFrame:
                 'Har_SolarRad_Mean': avg_rs
             })
     
-    print(f"Computed solar radiation for {len(output_rows)} location-years.")
+    # print(f"Computed solar radiation for {len(output_rows)} location-years.")
     return pd.DataFrame(output_rows)
 
 
@@ -392,13 +392,31 @@ def extract_era5_temp_precip_covariates(df: pd.DataFrame) -> pd.DataFrame:
             continue
 
         # Annual temperature stats
-        temp_stats = df_merged.groupby(['Year']).apply(lambda x: pd.Series({
-            "ERA5_Temp_Mean": ((x['Tmax'] + x['Tmin']) / 2).mean(),
-            "ERA5_Mean_Diu_Rng": (x['Tmax'] - x['Tmin']).mean(),
-            "ERA5_Temp_Max_HotMon": x.groupby(x['Month'])['Tmax'].mean().max(),
-            "ERA5_Temp_Min_ColdMon": x.groupby(x['Month'])['Tmin'].mean().min(),
-            "ERA5_Temp_Rng": x['Tmax'].max() - x['Tmin'].min()
-        })).reset_index()
+        # Compute monthly Tmax/Tmin means for hot/cold month stats
+        monthly_stats = df_merged.groupby(['Year', 'Month']).agg({
+            'Tmax': 'mean',
+            'Tmin': 'mean'
+        }).reset_index()
+
+        # Now aggregate per year:
+        year_stats = []
+        for year, group in df_merged.groupby('Year'):
+            mask = (monthly_stats['Year'] == year)
+            hottest_month = monthly_stats[mask]['Tmax'].max()
+            coldest_month = monthly_stats[mask]['Tmin'].min()
+            temp_mean = ((group['Tmax'] + group['Tmin']) / 2).mean()
+            mean_diu_rng = (group['Tmax'] - group['Tmin']).mean()
+            temp_rng = group['Tmax'].max() - group['Tmin'].min()
+            year_stats.append({
+                'Year': year,
+                "ERA5_Temp_Mean": temp_mean,
+                "ERA5_Mean_Diu_Rng": mean_diu_rng,
+                "ERA5_Temp_Max_HotMon": hottest_month,
+                "ERA5_Temp_Min_ColdMon": coldest_month,
+                "ERA5_Temp_Rng": temp_rng
+            })
+        temp_stats = pd.DataFrame(year_stats)
+
 
         # Quarterly aggregation
         results = []
