@@ -66,6 +66,7 @@ def compute_solar_radiation_from_wc_range(df: pd.DataFrame) -> pd.DataFrame:
     output_rows = []
 
     for idx, row in tqdm(df.iterrows(), total=len(df), desc="SolarRad"):
+        id = row['id']
         lat = row['latitude']
         lon = row['longitude']
         try:
@@ -111,6 +112,7 @@ def compute_solar_radiation_from_wc_range(df: pd.DataFrame) -> pd.DataFrame:
         for year, rs_list in rs_by_year.items():
             avg_rs = np.nanmean(rs_list)
             output_rows.append({
+                'id': id,
                 'latitude': lat,
                 'longitude': lon,
                 'year': year,
@@ -132,6 +134,7 @@ def extract_et_covariates(df: pd.DataFrame) -> pd.DataFrame:
     all_results = []
 
     for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing ET seasonal covariates"):
+        id = row['id']
         lat = row['latitude']
         lon = row['longitude']
         values = row[et_columns].values.tolist()
@@ -152,6 +155,7 @@ def extract_et_covariates(df: pd.DataFrame) -> pd.DataFrame:
 
         for _, row_cov in summary_df.iterrows():
             result = {
+                'id': id,
                 'latitude': lat,
                 'longitude': lon,
                 'year': int(row_cov['Year'])
@@ -176,13 +180,14 @@ def extract_chirps_covariates_from_daily_columns(df: pd.DataFrame) -> pd.DataFra
     all_results = []
 
     for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing CHIRPS seasonal covariates"):
+        id = row['id']
         lat = row['latitude']
         lon = row['longitude']
         precip_values = row[chirps_columns].values.tolist()
         seasonal_df = calculate_precip_covariates(date_range, (lon, lat), precip_values, prefix="CHIRPS_")
 
         for _, cov_row in seasonal_df.iterrows():
-            result = {'latitude': lat, 'longitude': lon, 'year': cov_row['Year']}
+            result = {'id': id, 'latitude': lat, 'longitude': lon, 'year': cov_row['Year']}
             for col in cov_row.index:
                 if col not in ['Year', 'Location']:
                     result[col] = cov_row[col]
@@ -266,6 +271,7 @@ def extract_era5_covariates(df: pd.DataFrame) -> pd.DataFrame:
             continue
 
         for idx, row in tqdm(df.iterrows(), total=len(df), desc=f"Processing ERA5 {var} covariates"):
+            id = row['id']
             lat = row['latitude']
             lon = row['longitude']
 
@@ -302,6 +308,7 @@ def extract_era5_covariates(df: pd.DataFrame) -> pd.DataFrame:
 
             for _, row_cov in summary.iterrows():
                 result = {
+                    'id': id,
                     'latitude': lat,
                     'longitude': lon,
                     'year': int(row_cov['Year'])
@@ -329,6 +336,7 @@ def extract_era5_totprec(df: pd.DataFrame) -> pd.DataFrame:
 
     all_results = []
     for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing ERA5 totprec seasonal covariates"):
+        id = row['id']
         lat = row['latitude']
         lon = row['longitude']
         precip_values = row[matching_columns].values.tolist()
@@ -336,6 +344,7 @@ def extract_era5_totprec(df: pd.DataFrame) -> pd.DataFrame:
 
         for _, cov_row in seasonal_df.iterrows():
             result = {
+                'id': id,
                 'latitude': lat,
                 'longitude': lon,
                 'year': cov_row['Year']
@@ -369,6 +378,7 @@ def extract_era5_temp_precip_covariates(df: pd.DataFrame) -> pd.DataFrame:
                   for col in prec_cols]
 
     for idx, row in tqdm(df.iterrows(), total=len(df), desc="ERA5 temp+precip covariates"):
+        id = row['id']
         lat = row['latitude']
         lon = row['longitude']
         temp_series = pd.Series(pd.to_numeric(row[temp_cols].values, errors='coerce'), index=dates_temp)
@@ -448,6 +458,7 @@ def extract_era5_temp_precip_covariates(df: pd.DataFrame) -> pd.DataFrame:
             coldest_q = min(q_metrics, key=lambda k: q_metrics[k]["mean_temp"])
 
             results.append({
+                "id": id,
                 "latitude": lat,
                 "longitude": lon,
                 "year": year,
@@ -463,6 +474,7 @@ def extract_era5_temp_precip_covariates(df: pd.DataFrame) -> pd.DataFrame:
 
         df_quarters = pd.DataFrame(results)
         final = pd.merge(temp_stats, df_quarters, left_on='Year', right_on='year', how='inner').drop(columns=['year'])
+        final['id'] = id
         final['latitude'] = lat
         final['longitude'] = lon
         final = final.rename(columns={'Year': 'year'})  # Optional but consistent
@@ -483,6 +495,7 @@ def extract_biovars_from_tc_and_chirps(df, tc_vars=['tmax', 'tmin'], chirps_pref
     chirps_day_cols = [col for col in df.columns if re.match(rf"{chirps_prefix}\d{{4}}-\d{{2}}-\d{{2}}", col)]
 
     for idx, row in tqdm(df.iterrows(), total=len(df), desc="BIOVARS from TC + CHIRPS"):
+        id = row['id']
         lat, lon = row['latitude'], row['longitude']
 
         # Aggregate CHIRPS daily data to monthly sums for this row
@@ -524,6 +537,7 @@ def extract_biovars_from_tc_and_chirps(df, tc_vars=['tmax', 'tmin'], chirps_pref
                 try:
                     bio = compute_biovars(prec_vals, tmin_vals, tmax_vals)
                     bio_result = {
+                        'id': id,
                         'latitude': lat,
                         'longitude': lon,
                         'year': year
@@ -551,6 +565,7 @@ def extract_monthly_covariates(df: pd.DataFrame, source: str, variables: list, p
 
 
     for idx, row in tqdm(df.iterrows(), total=len(df), desc=f"Processing {source.upper()} covariates"):
+        id = row['id']
         lat, lon = row['latitude'], row['longitude']
 
         # --- Seasonal stats for each variable ---
@@ -580,6 +595,7 @@ def extract_monthly_covariates(df: pd.DataFrame, source: str, variables: list, p
             summary_df = pd.concat(summary, axis=1).reset_index()
             for _, row_cov in summary_df.iterrows():
                 result = {
+                    'id': id,
                     'latitude': lat,
                     'longitude': lon,
                     'year': int(row_cov['Year'])
@@ -594,6 +610,7 @@ def extract_monthly_covariates(df: pd.DataFrame, source: str, variables: list, p
                 ann_mean = tmp_df.groupby('Year')['Value'].mean().reset_index()
                 for _, row_ann in ann_mean.iterrows():
                     all_results.append({
+                        'id': id,
                         'latitude': lat,
                         'longitude': lon,
                         'year': int(row_ann['Year']),
@@ -617,8 +634,8 @@ def main():
         return
     
         # --- Extract static elev_ and soil_ columns ---
-    static_cols = ['latitude', 'longitude'] + [col for col in df.columns if col.startswith("elev_") or col.startswith("soil_") or col.startswith("bio_") or col.startswith("koppen_")]
-    static_df = df[static_cols].drop_duplicates(subset=["latitude", "longitude"])
+    static_cols = ['id', 'latitude', 'longitude'] + [col for col in df.columns if col.startswith("elev_") or col.startswith("soil_") or col.startswith("bio_") or col.startswith("koppen_")]
+    static_df = df[static_cols].drop_duplicates(subset=["id", "latitude", "longitude"])
 
     chirps_df = extract_chirps_covariates_from_daily_columns(df)
     et_df = extract_et_covariates(df)
@@ -639,13 +656,13 @@ def main():
     dynamic_dfs = [chirps_df, et_df, wc_df, spei_df, tc_df, np_df, era5_p_df, era5_rest_df, era5_quartile, SolarRad, bio_df]
     for i, d in enumerate(dynamic_dfs):
         if d is not None and not d.empty:
-            dynamic_dfs[i] = d.groupby(['latitude', 'longitude', 'year']).first().reset_index()
+            dynamic_dfs[i] = d.groupby(['id', 'latitude', 'longitude', 'year']).first().reset_index()
 
     from functools import reduce
     dynamic_dfs_valid = [d for d in dynamic_dfs if not d.empty]
     if dynamic_dfs_valid:
         merged_df = reduce(
-            lambda left, right: pd.merge(left, right, on=['latitude', 'longitude', 'year'], how='outer'),
+            lambda left, right: pd.merge(left, right, on=['id', 'latitude', 'longitude', 'year'], how='outer'),
             dynamic_dfs_valid
         )
     else:
@@ -653,7 +670,7 @@ def main():
 
     # Merge static columns after
     if not static_df.empty and not merged_df.empty:
-        merged_df = pd.merge(merged_df, static_df, on=['latitude', 'longitude'], how='left')
+        merged_df = pd.merge(merged_df, static_df, on=['id', 'latitude', 'longitude'], how='left')
 
     if merged_df is not None and not merged_df.empty:
         for col in merged_df.columns:

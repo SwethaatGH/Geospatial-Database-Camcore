@@ -146,11 +146,15 @@ def zip_batches(batch_pattern, zip_output_path):
             zipf.write(file, arcname=os.path.basename(file))
     print(f"✅ Zipped all batches to {zip_output_path}")
 
+def construct_date(row, prefix):
+    try:
+        return f"{int(row[f'year_{prefix}']):04d}-{int(row[f'month_{prefix}']):02d}-{int(row[f'day_{prefix}']):02d}"
+    except Exception:
+        return None
+
 async def process_one_row(
     row,
     index,
-    start_col,
-    end_col,
     selected_set,
     cache,
     semaphore
@@ -159,10 +163,8 @@ async def process_one_row(
         lat = row['latitude']
         lon = row['longitude']
 
-        start_date_raw = row.get(start_col)
-        end_date_raw = row.get(end_col)
-        start_date = convert_date_format(start_date_raw)
-        end_date = convert_date_format(end_date_raw)
+        start_date = construct_date(row, "start")
+        end_date = construct_date(row, "end")
 
         row_updates = {}
 
@@ -213,7 +215,6 @@ async def process_csv_file(
     cache = load_cache(cache_file_path)
     df = pd.read_csv(input_csv_path)
     results_df = df.copy()
-    start_col, end_col = detect_date_columns(df)
     semaphore = asyncio.Semaphore(max_concurrent)
 
     batch_updates = []
@@ -224,8 +225,6 @@ async def process_csv_file(
         process_one_row(
             row,
             idx,
-            start_col,
-            end_col,
             selected_set,
             cache,
             semaphore
