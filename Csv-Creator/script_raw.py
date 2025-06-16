@@ -10,6 +10,7 @@ from collections import defaultdict
 import glob
 import zipfile
 
+
 # Add virtual environment site-packages to path
 venv_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Api-v1", "venv"))
 if sys.platform == 'win32':
@@ -138,6 +139,7 @@ def group_selected_vars_by_source(selected_set):
         by_source[src].append(var)
     return by_source
 
+
 def zip_batches(batch_pattern, zip_output_path):
     import glob
     batch_files = sorted(glob.glob(batch_pattern))
@@ -206,8 +208,7 @@ async def process_csv_file(
     max_concurrent=60,
     checkpoint_size=100,      # <--- rows per output file
     checkpoint_prefix="batches/results_batch_",
-    covariate_prefix="batches/covariates_batch"
-
+    zip_output_path = "batches/"
 ):
     import math
     cache = load_cache(cache_file_path)
@@ -255,13 +256,6 @@ async def process_csv_file(
             batch_df.to_csv(file_name, index=False)
             print(f"✅ Saved checkpoint {file_name} ({i+1} rows)")
 
-            cov_file = file_name.replace("results_batch_", "covariates_batch_")
-            subprocess.run([
-                sys.executable, "../Csv-Creator/covariablesv3.py",
-                "--input", file_name,
-                "--output", cov_file
-            ], check=True)
-
             batch_updates = []
             batch_indices = []
             batch_number += 1
@@ -279,28 +273,9 @@ async def process_csv_file(
         batch_df = batch_df.copy()
         batch_df.to_csv(file_name, index=False)
         print(f"✅ Saved checkpoint {file_name} (final batch)")
-
-        cov_file = file_name.replace("results_batch_", "covariates_batch_")
-        subprocess.run([
-            sys.executable, "../Csv-Creator/covariablesv3.py",
-            "--input", file_name,
-            "--output", cov_file
-        ], check=True)
-
-
-    batch_pattern = f"{covariate_prefix}*.csv" if covariate_prefix.endswith('_') else f"{covariate_prefix}_*.csv"
-    batch_files = sorted(
-        glob.glob(batch_pattern),
-        key=lambda x: int(x.split('_')[-1].split('.')[0])
-    )
-    merged_df = pd.concat([pd.read_csv(f) for f in batch_files], ignore_index=True)
-    merged_df.to_csv(output_csv_path, index=False)
-    print(f"✅ Merged all covariate files to {output_csv_path}")
-
-    raw_batch_pattern = f"{checkpoint_prefix}*.csv"
-    zip_output = output_csv_path.replace("covariates_", "raw_data_").replace(".csv", "_batches.zip")
-    zip_batches(raw_batch_pattern, zip_output)
-
+    
+    batch_pattern = f"{checkpoint_prefix}*.csv"
+    zip_batches(batch_pattern, output_csv_path)
 
 
 async def main():
