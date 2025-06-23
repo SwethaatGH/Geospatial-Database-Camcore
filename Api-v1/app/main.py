@@ -30,6 +30,7 @@ class DataSource(str, Enum):
     ERA5 = "era5"
     KOPPEN = "koppen"  # New addition for Köppen-Geiger
     BIOCLIM = "bio"
+    BRAZIL = "brazil"
 
 class Cadence(str, Enum):
     DAILY = "daily"
@@ -50,6 +51,7 @@ DATA_SOURCE_CADENCE = {
     DataSource.ERA5: Cadence.DAILY,
     DataSource.KOPPEN: Cadence.STATIC,
     DataSource.BIOCLIM: Cadence.STATIC,
+    DataSource.BRAZIL: Cadence.DAILY,
     
 }
 
@@ -65,6 +67,7 @@ DATA_SOURCE_TABLES = {
     DataSource.ERA5: "era5_data",
     DataSource.KOPPEN: "koppen_data",  # Add the table we created
     DataSource.BIOCLIM: "bio_data",
+    DataSource.BRAZIL: "brazil_data",
 }
 
 AVAILABLE_VARIABLES = {
@@ -95,6 +98,7 @@ AVAILABLE_VARIABLES = {
     DataSource.KOPPEN: ["bsh", "dfb", "cfc", "cfa", "ef", "cwc", "af", "et", "cwb", "cwa",
     "csc", "bwk", "aw", "bsk", "dsb", "csa", "all", "dwb", "am", "dfc",
     "dwc", "cfb", "bwh", "csb", "dsc"],
+    DataSource.BRAZIL: ["ETo", "pr", "Tmax", "Tmin", "RH", "u2", "Rs"],
 }
 
 DATASOURCES_WITH_VARIABLES = [
@@ -105,7 +109,8 @@ DATASOURCES_WITH_VARIABLES = [
     DataSource.ELEVATION,
     DataSource.SOILGRIDS,
     DataSource.BIOCLIM,
-    DataSource.KOPPEN
+    DataSource.KOPPEN,
+    DataSource.BRAZIL,
 ]
 
 STATIC_DATA_SOURCES = [
