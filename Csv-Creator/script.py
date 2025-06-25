@@ -9,6 +9,7 @@ from dateutil.parser import parse as try_parse_date
 from collections import defaultdict
 import glob
 import zipfile
+import shutil
 
 # Add virtual environment site-packages to path
 venv_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Api-v1", "venv"))
@@ -220,6 +221,11 @@ async def process_csv_file(
     batch_updates = []
     batch_indices = []
     batch_number = 0
+
+    batch_dir = os.path.dirname(checkpoint_prefix)
+    if os.path.exists(batch_dir):
+        shutil.rmtree(batch_dir)
+    os.makedirs(batch_dir, exist_ok=True)
 
     tasks = [
         process_one_row(
