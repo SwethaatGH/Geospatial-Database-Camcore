@@ -248,7 +248,8 @@
                 tc: "TerraClim",
                 np: "NASA POWER",
                 bio: "Bioclim",
-                koppen: "Koppen"
+                koppen: "Koppen",
+                brazil: "Brazilian Gridded"
             };
 
             const variableLabels = {
@@ -306,7 +307,10 @@
                 dfa: "Boreal - No Dry Season, Hot Summer (Dfa)", dfb: "Boreal - No Dry Season, Warm Summer (Dfb)", dfc: "Boreal - No Dry Season, Cool Summer", dfd: "Boreal - No Dry Season, Very Cold Winter (Dfd)",
                 dwa: "Boreal - Dry Winter, Hot Summer (Dwa)", dwb: "Boreal - Dry Winter, Warm Summer (Dwb)", dwc: "Boreal - Dry Winter, Cool Summer (Dwc)", dwd: "Boreal - Dry Winter, Very Cold Winter (Dwd)",
                 ef: "Frost (EF)",
-                all: "All Zones Combined (All)"
+                all: "All Zones Combined (All)",
+                // Brazil
+                ETo: "Evapotranspiration", RH: "Relative Humidity", Rs: "Solar Radiation", Tmax: "Maximum Temperature",
+                Tmin: "Minimum Temperature", pr: "Precipitation", u2: "Wind Speed"
 
             };
 
@@ -329,7 +333,8 @@
                 bio: ["bio1", "bio2", "bio3", "bio4", "bio5", "bio6", "bio7", "bio8", "bio9", "bio10", "bio11", "bio12", "bio13", "bio14", "bio15", "bio16", "bio17", "bio18", "bio19"],
                 koppen: ["bsh", "dfb", "cfc", "cfa", "ef", "cwc", "af", "et", "cwb", "cwa",
                         "csc", "bwk", "aw", "bsk", "dsb", "csa", "all", "dwb", "am", "dfc",
-                        "dwc", "cfb", "bwh", "csb", "dsc"]
+                        "dwc", "cfb", "bwh", "csb", "dsc"],
+                brazil: ["ETo", "pr", "Tmax", "Tmin", "RH", "u2", "Rs"]
             };
 
             for (const source in dataSources) {

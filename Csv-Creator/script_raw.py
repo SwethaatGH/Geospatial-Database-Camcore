@@ -90,7 +90,8 @@ DATA_SOURCES = {
         "bio16", "bio17", "bio18", "bio19"],
     "koppen": ["bsh", "dfb", "cfc", "cfa", "ef", "cwc", "af", "et", "cwb", "cwa",
     "csc", "bwk", "aw", "bsk", "dsb", "csa", "all", "dwb", "am", "dfc",
-    "dwc", "cfb", "bwh", "csb", "dsc"]
+    "dwc", "cfb", "bwh", "csb", "dsc"],
+    "brazil": ["ETo", "pr", "Tmax", "Tmin", "RH", "u2", "Rs"]
 }
 
 def save_cache(cache, cache_file_path):

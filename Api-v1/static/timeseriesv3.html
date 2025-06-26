@@ -186,6 +186,7 @@
                         <option value="np">NASA POWER</option>
                         <option value="bio">Bioclim</option>
                         <option value="koppen">Koppen</option>
+                        <option value="brazil">Brazilian Grid</option>
                     </select>
                     <label for="variable-point">Variable:</label>
                     <select id="variable-point">
@@ -220,6 +221,7 @@
                         <option value="np">NASA POWER</option>
                         <option value="bio">Bioclim</option>
                         <option value="koppen">Koppen</option>
+                        <option value="brazil">Brazilian Grid</option>
                     </select>
                     <label for="variable-bbox">Variable:</label>
                     <select id="variable-bbox">
@@ -504,6 +506,15 @@
                 addOption(variableSelect, 'volsowat1', 'Soil Water Vol Layer 1');
                 addOption(variableSelect, 'volsowat12', 'Soil Water Vol Layer 2');
                 addOption(variableSelect, 'volsowat13', 'Soil Water Vol Layer 3');
+                dateControls.style.display = 'block';
+            } else if (dataSource === 'brazil') {
+                addOption(variableSelect, 'ETo', 'Evapotranspiration');
+                addOption(variableSelect, 'u2', 'Wind Speed at 2 metres');
+                addOption(variableSelect, 'RH', 'Relative Humidity');
+                addOption(variableSelect, 'Rs', 'Solar Radiation');
+                addOption(variableSelect, 'Tmax', 'Maximum Temperature');
+                addOption(variableSelect, 'Tmin', 'Minimum Temperature');
+                addOption(variableSelect, 'pr', 'Precipitation');
                 dateControls.style.display = 'block';
             }
         }
