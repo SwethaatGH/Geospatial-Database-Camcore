@@ -259,6 +259,69 @@ def calculate_precip_covariates(date_range, coordinates, precip_values, prefix="
     return full_df
 
 
+def extract_brazil_covariates(df: pd.DataFrame) -> pd.DataFrame:
+    all_results = []
+
+    for var in ["ETo", "pr", "Tmax", "Tmin", "RH", "u2", "Rs"]:
+        
+        pattern = re.compile(rf"brazil_{var}_(\d{{4}})-(\d{{2}})-(\d{{2}})")
+        matching_cols = [col for col in df.columns if pattern.match(col)]
+        if not matching_cols:
+            continue
+
+        for idx, row in tqdm(df.iterrows(), total=len(df), desc=f"Processing Brazil {var} covariates"):
+            id = row['id']
+            lat = row['latitude']
+            lon = row['longitude']
+
+            valid_cols = [col for col in matching_cols if not pd.isna(row[col])]
+            if not valid_cols:
+                continue
+
+            dates, values = [], []
+            for col in valid_cols:
+                m = pattern.match(col)
+                if m:
+                    dates.append(pd.to_datetime(f"{m.group(1)}-{m.group(2)}-{m.group(3)}"))
+                    values.append(pd.to_numeric(row[col], errors='coerce'))
+
+            if not values or all(pd.isna(values)):
+                continue
+
+            tmp_df = pd.DataFrame({'Date': dates, 'Value': values}).dropna()
+            tmp_df['Year'] = tmp_df['Date'].dt.year
+            tmp_df['Season'] = tmp_df['Date'].apply(lambda d: get_season(d)[1])
+
+            grouped = tmp_df.groupby(['Year', 'Season'])['Value']
+            summary = grouped.agg(
+                mean='mean',
+                min='min',
+                max='max',
+                std='std',
+                skew='skew',
+                kurtosis=lambda x: kurtosis(x, nan_policy='omit') if x.count() >= 4 and x.std() > 0 else np.nan,
+                p5=lambda x: x.quantile(0.05),
+                p95=lambda x: x.quantile(0.95),
+                cv=lambda x: x.std() / x.mean() if x.mean() != 0 else np.nan
+            ).reset_index()
+
+            for _, row_cov in summary.iterrows():
+                result = {
+                    'id': id,
+                    'latitude': lat,
+                    'longitude': lon,
+                    'year': int(row_cov['Year'])
+                }
+                season_code = row_cov['Season'][:2]
+                for stat_key, label in zip(
+                    ['mean', 'min', 'max', 'std', 'cv', 'skew', 'kurtosis', 'p5', 'p95'],
+                    ['mean', 'min', 'max', 'std', 'CV', 'Skew', 'Kurtosis', 'Q5', 'Q95']
+                ):
+                    result[f"Brazil_{var}_{label}_{season_code}"] = row_cov[stat_key]
+                all_results.append(result)
+
+    return pd.DataFrame(all_results)
+
 def extract_era5_covariates(df: pd.DataFrame) -> pd.DataFrame:
     all_results = []
 
@@ -324,9 +387,7 @@ def extract_era5_covariates(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(all_results)
 
 
-
-def extract_era5_totprec(df: pd.DataFrame) -> pd.DataFrame:
-    pattern = re.compile(r"era5_totprec_(\d{4})-(\d{2})-(\d{2})")
+def extract_totprec(df: pd.DataFrame, pattern, prefix) -> pd.DataFrame:
     matching_columns = [col for col in df.columns if pattern.match(col)]
     if not matching_columns:
         print("No ERA5 totprec columns found.")
@@ -335,12 +396,12 @@ def extract_era5_totprec(df: pd.DataFrame) -> pd.DataFrame:
     date_range = [pd.to_datetime("{}-{}-{}".format(*pattern.match(col).groups())) for col in matching_columns]
 
     all_results = []
-    for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing ERA5 totprec seasonal covariates"):
+    for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing Brazil/ERA5 Totprec seasonal covariates"):
         id = row['id']
         lat = row['latitude']
         lon = row['longitude']
         precip_values = row[matching_columns].values.tolist()
-        seasonal_df = calculate_precip_covariates(date_range, (lon, lat), precip_values, prefix="ERA5_prec_")
+        seasonal_df = calculate_precip_covariates(date_range, (lon, lat), precip_values, prefix)
 
         for _, cov_row in seasonal_df.iterrows():
             result = {
@@ -478,6 +539,135 @@ def extract_era5_temp_precip_covariates(df: pd.DataFrame) -> pd.DataFrame:
         final['latitude'] = lat
         final['longitude'] = lon
         final = final.rename(columns={'Year': 'year'})  # Optional but consistent
+        all_results.append(final)
+
+    return pd.concat(all_results, ignore_index=True) if all_results else pd.DataFrame()
+
+def extract_brazil_temp_precip_covariates(df: pd.DataFrame) -> pd.DataFrame:
+    import re
+
+    all_results = []
+
+    pattern_tmax = re.compile(r"brazil_Tmax_(\d{4})-(\d{2})-(\d{2})")
+    pattern_tmin = re.compile(r"brazil_Tmin_(\d{4})-(\d{2})-(\d{2})")
+    pattern_prec = re.compile(r"brazil_pr_(\d{4})-(\d{2})-(\d{2})")
+
+    tmax_cols = [col for col in df.columns if pattern_tmax.match(col)]
+    tmin_cols = [col for col in df.columns if pattern_tmin.match(col)]
+    prec_cols = [col for col in df.columns if pattern_prec.match(col)]
+
+    # Sanity check
+    if not tmax_cols or not tmin_cols or not prec_cols:
+        print("Missing required Tmax, Tmin, or Precip columns.")
+        return pd.DataFrame()
+
+    # Convert column names to dates
+    dates_tmax = [pd.to_datetime(f"{pattern_tmax.match(col).group(1)}-{pattern_tmax.match(col).group(2)}-{pattern_tmax.match(col).group(3)}")
+                  for col in tmax_cols]
+    dates_tmin = [pd.to_datetime(f"{pattern_tmin.match(col).group(1)}-{pattern_tmin.match(col).group(2)}-{pattern_tmin.match(col).group(3)}")
+                  for col in tmin_cols]
+    dates_prec = [pd.to_datetime(f"{pattern_prec.match(col).group(1)}-{pattern_prec.match(col).group(2)}-{pattern_prec.match(col).group(3)}")
+                  for col in prec_cols]
+
+    for idx, row in tqdm(df.iterrows(), total=len(df), desc="ERA5 tmax/tmin/prec covariates"):
+        id = row['id']
+        lat = row['latitude']
+        lon = row['longitude']
+        tmax_series = pd.Series(pd.to_numeric(row[tmax_cols].values, errors='coerce'), index=dates_tmax)
+        tmin_series = pd.Series(pd.to_numeric(row[tmin_cols].values, errors='coerce'), index=dates_tmin)
+        prec_series = pd.Series(pd.to_numeric(row[prec_cols].values, errors='coerce'), index=dates_prec)
+
+        # Align indexes just in case, and drop missing data
+        df_tmax = tmax_series.dropna().reset_index()
+        df_tmax.columns = ['time', 'Tmax']
+        df_tmin = tmin_series.dropna().reset_index()
+        df_tmin.columns = ['time', 'Tmin']
+        df_prec = prec_series.dropna().reset_index()
+        df_prec.columns = ['time', 'Precipitation']
+
+        # Merge on 'time'
+        df_merged = pd.merge(df_tmax, df_tmin, on='time', how='inner')
+        df_merged = pd.merge(df_merged, df_prec, on='time', how='inner')
+        df_merged['Year'] = df_merged['time'].dt.year
+        df_merged['Month'] = df_merged['time'].dt.month
+
+        if df_merged.empty:
+            continue
+
+        # Annual temperature stats
+        monthly_stats = df_merged.groupby(['Year', 'Month']).agg({
+            'Tmax': 'mean',
+            'Tmin': 'mean'
+        }).reset_index()
+
+        year_stats = []
+        for year, group in df_merged.groupby('Year'):
+            mask = (monthly_stats['Year'] == year)
+            hottest_month = monthly_stats[mask]['Tmax'].max()
+            coldest_month = monthly_stats[mask]['Tmin'].min()
+            temp_mean = ((group['Tmax'] + group['Tmin']) / 2).mean()
+            mean_diu_rng = (group['Tmax'] - group['Tmin']).mean()
+            temp_rng = group['Tmax'].max() - group['Tmin'].min()
+            year_stats.append({
+                'Year': year,
+                "ERA5_Temp_Mean": temp_mean,
+                "ERA5_Mean_Diu_Rng": mean_diu_rng,
+                "ERA5_Temp_Max_HotMon": hottest_month,
+                "ERA5_Temp_Min_ColdMon": coldest_month,
+                "ERA5_Temp_Rng": temp_rng
+            })
+        temp_stats = pd.DataFrame(year_stats)
+
+        # Quarterly aggregation
+        results = []
+        for year in df_merged['Year'].unique():
+            df_y = df_merged[df_merged['Year'] == year].copy()
+            df_y = df_y.set_index('time')
+            df_y = df_y.sort_index()
+
+            quarters = {
+                "Q1": slice(f"{year}-01-01", f"{year}-03-31"),
+                "Q2": slice(f"{year}-04-01", f"{year}-06-30"),
+                "Q3": slice(f"{year}-07-01", f"{year}-09-30"),
+                "Q4": slice(f"{year}-10-01", f"{year}-12-31")
+            }
+
+            q_metrics = {}
+            for q, rng in quarters.items():
+                q_tmax = df_y.loc[rng]['Tmax'].mean()
+                q_tmin = df_y.loc[rng]['Tmin'].mean()
+                q_prec = df_y.loc[rng]['Precipitation'].sum()
+                q_metrics[q] = {
+                    "mean_temp": (q_tmax + q_tmin) / 2,
+                    "precip": q_prec
+                }
+
+            wettest_q = max(q_metrics, key=lambda k: q_metrics[k]["precip"])
+            driest_q = min(q_metrics, key=lambda k: q_metrics[k]["precip"])
+            hottest_q = max(q_metrics, key=lambda k: q_metrics[k]["mean_temp"])
+            coldest_q = min(q_metrics, key=lambda k: q_metrics[k]["mean_temp"])
+
+            results.append({
+                "id": id,
+                "latitude": lat,
+                "longitude": lon,
+                "year": year,
+                "ERA5_Temp_Mean_WetQ": q_metrics[wettest_q]["mean_temp"],
+                "ERA5_Temp_Mean_DryQ": q_metrics[driest_q]["mean_temp"],
+                "ERA5_Temp_Mean_HotQ": q_metrics[hottest_q]["mean_temp"],
+                "ERA5_Temp_Mean_ColdQ": q_metrics[coldest_q]["mean_temp"],
+                "ERA5_Pr_Mean_WetQ": q_metrics[wettest_q]["precip"],
+                "ERA5_Pr_Mean_DryQ": q_metrics[driest_q]["precip"],
+                "ERA5_Pr_Mean_HotQ": q_metrics[hottest_q]["precip"],
+                "ERA5_Pr_Mean_ColdQ": q_metrics[coldest_q]["precip"]
+            })
+
+        df_quarters = pd.DataFrame(results)
+        final = pd.merge(temp_stats, df_quarters, left_on='Year', right_on='year', how='inner').drop(columns=['year'])
+        final['id'] = id
+        final['latitude'] = lat
+        final['longitude'] = lon
+        final = final.rename(columns={'Year': 'year'})
         all_results.append(final)
 
     return pd.concat(all_results, ignore_index=True) if all_results else pd.DataFrame()
@@ -647,9 +837,12 @@ def main():
            "allsky_sfc_sw_dwn", "allsky_sfc_sw_up", "allsky_sfc_uv_index", "allsky_sfc_uva", "allsky_sfc_uvb",
            "allsky_srf_alb", "midday_insol", "original_allsky_sfc_sw_diff", "original_allsky_sfc_sw_dirh", "psh", "pw",
            "srf_alb_adj", "toa_sw_dni", "toa_sw_dwn", "ts_adj"], 'NP')
-    era5_p_df = extract_era5_totprec(df)
+    era5_p_df = extract_totprec(df, re.compile(r"era5_totprec_(\d{4})-(\d{2})-(\d{2})"), "ERA5_prec_")
+    brazil_p_df = extract_totprec(df, re.compile(r"brazil_pr_(\d{4})-(\d{2})-(\d{2})"), "Brazil_pr_")
     era5_rest_df = extract_era5_covariates(df)
+    brazil_rest_df = extract_brazil_covariates(df)
     era5_quartile = extract_era5_temp_precip_covariates(df)
+    brazil_quartile = extract_brazil_temp_precip_covariates(df)
     SolarRad = compute_solar_radiation_from_wc_range(df)
     bio_df = extract_biovars_from_tc_and_chirps(df)
 
