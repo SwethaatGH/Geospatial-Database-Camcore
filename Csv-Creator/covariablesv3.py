@@ -262,7 +262,7 @@ def calculate_precip_covariates(date_range, coordinates, precip_values, prefix="
 def extract_brazil_covariates(df: pd.DataFrame) -> pd.DataFrame:
     all_results = []
 
-    for var in ["ETo", "pr", "Tmax", "Tmin", "RH", "u2", "Rs"]:
+    for var in ["eto", "tmax", "tmin", "rh", "u2", "rs"]:
         
         pattern = re.compile(rf"brazil_{var}_(\d{{4}})-(\d{{2}})-(\d{{2}})")
         matching_cols = [col for col in df.columns if pattern.match(col)]
@@ -548,8 +548,8 @@ def extract_brazil_temp_precip_covariates(df: pd.DataFrame) -> pd.DataFrame:
 
     all_results = []
 
-    pattern_tmax = re.compile(r"brazil_Tmax_(\d{4})-(\d{2})-(\d{2})")
-    pattern_tmin = re.compile(r"brazil_Tmin_(\d{4})-(\d{2})-(\d{2})")
+    pattern_tmax = re.compile(r"brazil_tmax_(\d{4})-(\d{2})-(\d{2})")
+    pattern_tmin = re.compile(r"brazil_tmin_(\d{4})-(\d{2})-(\d{2})")
     pattern_prec = re.compile(r"brazil_pr_(\d{4})-(\d{2})-(\d{2})")
 
     tmax_cols = [col for col in df.columns if pattern_tmax.match(col)]
@@ -558,7 +558,7 @@ def extract_brazil_temp_precip_covariates(df: pd.DataFrame) -> pd.DataFrame:
 
     # Sanity check
     if not tmax_cols or not tmin_cols or not prec_cols:
-        print("Missing required Tmax, Tmin, or Precip columns.")
+        print("Missing Brazil daily temperature or precipitation columns.")
         return pd.DataFrame()
 
     # Convert column names to dates
@@ -569,7 +569,7 @@ def extract_brazil_temp_precip_covariates(df: pd.DataFrame) -> pd.DataFrame:
     dates_prec = [pd.to_datetime(f"{pattern_prec.match(col).group(1)}-{pattern_prec.match(col).group(2)}-{pattern_prec.match(col).group(3)}")
                   for col in prec_cols]
 
-    for idx, row in tqdm(df.iterrows(), total=len(df), desc="ERA5 tmax/tmin/prec covariates"):
+    for idx, row in tqdm(df.iterrows(), total=len(df), desc="Brazil tmax/tmin/prec covariates"):
         id = row['id']
         lat = row['latitude']
         lon = row['longitude']
@@ -610,11 +610,11 @@ def extract_brazil_temp_precip_covariates(df: pd.DataFrame) -> pd.DataFrame:
             temp_rng = group['Tmax'].max() - group['Tmin'].min()
             year_stats.append({
                 'Year': year,
-                "ERA5_Temp_Mean": temp_mean,
-                "ERA5_Mean_Diu_Rng": mean_diu_rng,
-                "ERA5_Temp_Max_HotMon": hottest_month,
-                "ERA5_Temp_Min_ColdMon": coldest_month,
-                "ERA5_Temp_Rng": temp_rng
+                "Brazil_Temp_Mean": temp_mean,
+                "Brazil_Mean_Diu_Rng": mean_diu_rng,
+                "Brazil_Temp_Max_HotMon": hottest_month,
+                "Brazil_Temp_Min_ColdMon": coldest_month,
+                "Brazil_Temp_Rng": temp_rng
             })
         temp_stats = pd.DataFrame(year_stats)
 
@@ -652,14 +652,14 @@ def extract_brazil_temp_precip_covariates(df: pd.DataFrame) -> pd.DataFrame:
                 "latitude": lat,
                 "longitude": lon,
                 "year": year,
-                "ERA5_Temp_Mean_WetQ": q_metrics[wettest_q]["mean_temp"],
-                "ERA5_Temp_Mean_DryQ": q_metrics[driest_q]["mean_temp"],
-                "ERA5_Temp_Mean_HotQ": q_metrics[hottest_q]["mean_temp"],
-                "ERA5_Temp_Mean_ColdQ": q_metrics[coldest_q]["mean_temp"],
-                "ERA5_Pr_Mean_WetQ": q_metrics[wettest_q]["precip"],
-                "ERA5_Pr_Mean_DryQ": q_metrics[driest_q]["precip"],
-                "ERA5_Pr_Mean_HotQ": q_metrics[hottest_q]["precip"],
-                "ERA5_Pr_Mean_ColdQ": q_metrics[coldest_q]["precip"]
+                "Brazil_Temp_Mean_WetQ": q_metrics[wettest_q]["mean_temp"],
+                "Brazil_Temp_Mean_DryQ": q_metrics[driest_q]["mean_temp"],
+                "Brazil_Temp_Mean_HotQ": q_metrics[hottest_q]["mean_temp"],
+                "Brazil_Temp_Mean_ColdQ": q_metrics[coldest_q]["mean_temp"],
+                "Brazil_Pr_Mean_WetQ": q_metrics[wettest_q]["precip"],
+                "Brazil_Pr_Mean_DryQ": q_metrics[driest_q]["precip"],
+                "Brazil_Pr_Mean_HotQ": q_metrics[hottest_q]["precip"],
+                "Brazil_Pr_Mean_ColdQ": q_metrics[coldest_q]["precip"]
             })
 
         df_quarters = pd.DataFrame(results)
