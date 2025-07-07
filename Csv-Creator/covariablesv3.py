@@ -846,7 +846,7 @@ def main():
     SolarRad = compute_solar_radiation_from_wc_range(df)
     bio_df = extract_biovars_from_tc_and_chirps(df)
 
-    dynamic_dfs = [chirps_df, et_df, wc_df, spei_df, tc_df, np_df, era5_p_df, era5_rest_df, era5_quartile, SolarRad, bio_df]
+    dynamic_dfs = [chirps_df, et_df, wc_df, spei_df, tc_df, np_df, era5_p_df, era5_rest_df, era5_quartile, brazil_p_df, brazil_rest_df, brazil_quartile, SolarRad, bio_df]
     for i, d in enumerate(dynamic_dfs):
         if d is not None and not d.empty:
             dynamic_dfs[i] = d.groupby(['id', 'latitude', 'longitude', 'year']).first().reset_index()

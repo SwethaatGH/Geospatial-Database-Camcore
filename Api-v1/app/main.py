@@ -98,7 +98,7 @@ AVAILABLE_VARIABLES = {
     DataSource.KOPPEN: ["bsh", "dfb", "cfc", "cfa", "ef", "cwc", "af", "et", "cwb", "cwa",
     "csc", "bwk", "aw", "bsk", "dsb", "csa", "all", "dwb", "am", "dfc",
     "dwc", "cfb", "bwh", "csb", "dsc"],
-    DataSource.BRAZIL: ["ETo", "pr", "Tmax", "Tmin", "RH", "u2", "Rs"],
+    DataSource.BRAZIL: ["eto", "pr", "tmax", "tmin", "rh", "u2", "rs"],
 }
 
 DATASOURCES_WITH_VARIABLES = [
