@@ -831,7 +831,7 @@ def main():
     et_df = extract_et_covariates(df)
     wc_df = extract_monthly_covariates(df, 'wc', ["prec", "tmax", "tmin"], 'WC')
     spei_df = extract_monthly_covariates(df, 'spei', ["spei"], 'SPEI')
-    tc_df = extract_monthly_covariates(df, 'tc', ["aet", "def", "pdsi", "pet", "ppt", "q", "soil", "srad", "tmin", "vap", "vpd", "ws"], 'TC')
+    tc_df = extract_monthly_covariates(df, 'tc', ["aet", "def", "pdsi", "pet", "ppt", "q", "soil", "srad", "tmax", "tmin", "vap", "vpd", "ws"], 'TC')
     np_df = extract_monthly_covariates(df, 'np', ["airmass", "allsky_kt", "allsky_nkt", "allsky_sfc_lw_dwn", "allsky_sfc_lw_up", "allsky_sfc_par_diff",
            "allsky_sfc_par_dirh", "allsky_sfc_par_tot", "allsky_sfc_sw_diff", "allsky_sfc_sw_dirh", "allsky_sfc_sw_dni",
            "allsky_sfc_sw_dwn", "allsky_sfc_sw_up", "allsky_sfc_uv_index", "allsky_sfc_uva", "allsky_sfc_uvb",
@@ -846,7 +846,7 @@ def main():
     SolarRad = compute_solar_radiation_from_wc_range(df)
     bio_df = extract_biovars_from_tc_and_chirps(df)
 
-    dynamic_dfs = [chirps_df, et_df, wc_df, spei_df, tc_df, np_df, era5_p_df, era5_rest_df, era5_quartile, SolarRad, bio_df]
+    dynamic_dfs = [chirps_df, et_df, wc_df, spei_df, tc_df, np_df, era5_p_df, era5_rest_df, era5_quartile, brazil_p_df, brazil_rest_df, brazil_quartile, SolarRad, bio_df]
     for i, d in enumerate(dynamic_dfs):
         if d is not None and not d.empty:
             dynamic_dfs[i] = d.groupby(['id', 'latitude', 'longitude', 'year']).first().reset_index()
