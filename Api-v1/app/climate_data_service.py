@@ -102,6 +102,14 @@ async def get_climate_data_timeseries_logic(
             else:
                 variables = AVAILABLE_VARIABLES.get(data_source, [])
             var_list = ', '.join([f"'{v}'" for v in variables])
+
+            # -- Correct the latitude if it's a flipped Brazil table --
+            corrected_lat = lat
+            if table_name.startswith("brazil"):
+                corrected_lat = -67.505 - lat  # Flip latitude over southern Brazil
+
+            point_wkt = f"ST_SetSRID(ST_Point({lon}, {corrected_lat}), 4326)"
+
             query = text(f"""
                 SELECT 
                     date_id,
@@ -116,6 +124,7 @@ async def get_climate_data_timeseries_logic(
                 GROUP BY date_id
                 ORDER BY date_id
             """)
+
             rows = (await db.execute(query, {"start": start_date_obj, "end": end_date_obj})).mappings().all()
             for row in rows:
                 item = {
@@ -125,6 +134,7 @@ async def get_climate_data_timeseries_logic(
                     "values": {k: v for k, v in row.items() if k != "date_id" and v is not None}
                 }
                 result["data"].append(item)
+
             return result
 
         else:
