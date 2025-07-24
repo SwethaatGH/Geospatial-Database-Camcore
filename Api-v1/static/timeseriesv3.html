@@ -349,6 +349,7 @@
                 addOption(variableSelect, 'roughness', 'Roughness');
                 addOption(variableSelect, 'flowdir', 'Flow Direction');
                 addOption(variableSelect, 'hillshade', 'Hillshade');
+                addOption(variableSelect, 'hand', 'Height Above Nearest Drainage');
                 dateControls.style.display = 'none';
 
             } 
@@ -1196,6 +1197,7 @@
                 'et': `rgba(128, 0, 128, ${alpha})`,
                 'elev': `rgba(139, 69, 19, ${alpha})`,
                 'slope': `rgba(205, 92, 92, ${alpha})`,
+                'hand': `rgba(255, 215, 0, ${alpha})`,
                 'aspect': `rgba(218, 165, 32, ${alpha})`,
                 'tpi': `rgba(154, 205, 50, ${alpha})`,
                 'tri': `rgba(106, 90, 205, ${alpha})`,
@@ -1230,6 +1232,7 @@
                 'et': 'Evapotranspiration',
                 'elev': 'Elevation',
                 'slope': 'Slope',
+                'hand': 'Height Above Nearest Drainage',
                 'aspect': 'Aspect',
                 'tpi': 'Topographic Position Index',
                 'tri': 'Terrain Ruggedness Index',
@@ -1264,6 +1267,8 @@
                 return 'm';
             } else if (variable === 'slope') {
                 return 'degrees';
+            } else if (variable === 'hand') {
+                return 'm';
             } else if (variable === 'aspect') {
                 return 'degrees';
             } else if (variable === 'tpi') {
