@@ -74,7 +74,7 @@ DATA_SOURCES = {
     "spei": ["spei"],
     "chirps": ["chirps"],
     "et": ["et"],
-    "elev": ["aspect", "elev", "flowdir", "hillshade", "roughness", "tpi", "tri", "slope"],
+    "elev": ["aspect", "elev", "flowdir", "hillshade", "roughness", "tpi", "tri", "slope", "hand"],
     "soil": ["bdod", "cec", "cfvo", "clay", "nitrogen", "ocd", "ocs", "phh2o", "sand", "silt", "soc", "wv0010", "wv0030", "wv1500"],
     "tc": ["aet", "def", "pdsi", "pet", "ppt", "q", "soil", "srad", "tmin", "tmax", "vap", "vpd", "ws"],
     "np": ["airmass", "allsky_kt", "allsky_nkt", "allsky_sfc_lw_dwn", "allsky_sfc_lw_up", "allsky_sfc_par_diff",
@@ -91,7 +91,7 @@ DATA_SOURCES = {
     "koppen": ["bsh", "dfb", "cfc", "cfa", "ef", "cwc", "af", "et", "cwb", "cwa",
     "csc", "bwk", "aw", "bsk", "dsb", "csa", "all", "dwb", "am", "dfc",
     "dwc", "cfb", "bwh", "csb", "dsc"],
-    "brazil": ["ETo", "pr", "Tmax", "Tmin", "RH", "u2", "Rs"]
+    "brazil": ["eto", "pr", "tmax", "tmin", "rh", "u2", "rs"]
 }
 
 def save_cache(cache, cache_file_path):
@@ -209,7 +209,11 @@ async def process_csv_file(
     default_end_date=None,
     cache_file_path="climate_data_cache.json",
     selected_set=None,
+<<<<<<< HEAD
     max_concurrent=150,
+=======
+    max_concurrent=100,
+>>>>>>> API-V4_CSV-V3
     checkpoint_size=1000,      # <--- rows per output file
     checkpoint_prefix="batches/results_batch_",
     zip_output_path = "batches/"

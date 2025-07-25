@@ -674,6 +674,12 @@ def main():
     # --- Step 4: Filter out empty DFs (and those with 0 columns) ---
     dynamic_ddfs_valid = [d for d in dynamic_ddfs if len(d.columns) > 0]
 
+    for i, d in enumerate(dynamic_ddfs_valid):
+        dups = d.groupby(['id', 'latitude', 'longitude', 'year']).size().compute()
+        dups = dups[dups > 1]
+        if not dups.empty:
+            print(f"DF {i} has duplicate keys!")
+
     # --- Step 5: Merge all dynamic DFs on id/lat/lon/year (outer join, Dask way) ---
     from functools import reduce
 
