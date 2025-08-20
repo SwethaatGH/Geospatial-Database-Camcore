@@ -154,6 +154,7 @@ async def get_climate_data_timeseries(
         data_source=data_source, variable=variable,
         db=db
     )
+## Most used functions above, new endpoints below ##
 
 # CSV Processor Endpoint
 @app.post("/api/process-csv")
