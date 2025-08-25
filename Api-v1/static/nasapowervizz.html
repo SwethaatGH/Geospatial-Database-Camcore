@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NASA POWER Solar and Climate Explorer</title>
+    <!-- Mapbox GL -->
+    <script src='https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.css' rel='stylesheet' />
+    <!-- Chart.js for time series visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: Arial, sans-serif;
+            color: #333;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .header {
+            padding: 15px;
+            background-color: #1a237e;
+            color: white;
+            border-bottom: 1px solid #0d1666;
+        }
+
+        .content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .map-container {
+            width: 60%;
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        .chart-container {
+            width: 40%;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-section {
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #1a237e;
+        }
+
+        .chart-wrapper {
+            height: 200px;
+            position: relative;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            flex: 1;
+            min-width: 200px;
+            margin-bottom: 10px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: white;
+        }
+
+        select,
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 8px 15px;
+            background-color: #ff9800;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #f57c00;
+        }
+
+        .button-sm {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        #loading {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.7);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 2s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .aggregation-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .radio-label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .radio-label input {
+            margin-right: 5px;
+            width: auto;
+        }
+
+        /* Map point markers */
+        .map-point {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            border: 1px solid white;
+            cursor: pointer;
+            background-color: #ff9800;
+        }
+
+        /* Variable selector */
+        .variable-selector {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 10px;
+        }
+
+        .variable-button {
+            padding: 5px 10px;
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+
+        .variable-button:hover {
+            background-color: #e0e0e0;
+        }
+
+        .variable-button.selected {
+            background-color: #1a237e;
+            color: white;
+        }
+
+        /* Variable categories */
+        .variable-category {
+            margin-bottom: 15px;
+        }
+
+        .category-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #1a237e;
+        }
+
+        /* Solar visualization */
+        .solar-viz {
+            position: relative;
+            height: 150px;
+            background: linear-gradient(to bottom, #87CEEB, #1a237e);
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .sun {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: radial-gradient(circle, #FFFF00, #FFA500);
+            border-radius: 50%;
+            box-shadow: 0 0 20px #FFA500;
+        }
+
+        .ground {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 20px;
+            background-color: #8B4513;
+        }
+
+        .ray {
+            position: absolute;
+            height: 2px;
+            background-color: rgba(255, 255, 0, 0.7);
+            transform-origin: left center;
+        }
+
+        /* Style for the solar panel visualization */
+        .solar-panel {
+            position: absolute;
+            width: 60px;
+            height: 40px;
+            background-color: #1a1a1a;
+            border: 2px solid #333;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* Legend */
+        .legend {
+            background-color: white;
+            border-radius: 3px;
+            bottom: 30px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+            padding: 10px;
+            position: absolute;
+            left: 10px;
+            z-index: 1;
+        }
+
+        .legend h4 {
+            margin: 0 0 10px;
+        }
+
+        .legend div {
+            height: 10px;
+            width: 100%;
+            margin-bottom: 5px;
+        }
+
+        .legend-key {
+            display: inline-block;
+            width: 100%;
+            height: 10px;
+            margin-bottom: 5px;
+        }
+
+        /* Statistics panel */
+        .stats-panel {
+            margin-top: 15px;
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .stat-box {
+            background-color: #f9f9f9;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .stat-box:hover {
+            transform: scale(1.03);
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #ff9800;
+        }
+
+        /* Variable info panel */
+        .variable-info {
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+
+        .variable-description {
+            margin-top: 5px;
+            border-left: 3px solid #1a237e;
+            padding-left: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loading">
+        <div class="spinner"></div>
+        <div style="margin-top: 10px;">Loading data...</div>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1>NASA POWER Solar and Climate Explorer</h1>
+            <div class="controls">
+                <div class="form-group">
+                    <label for="start-date">Start Date:</label>
+                    <input type="date" id="start-date">
+                </div>
+                <div class="form-group">
+                    <label for="end-date">End Date:</label>
+                    <input type="date" id="end-date">
+                </div>
+                <div class="form-group">
+                    <label for="grid-size">Grid Size:</label>
+                    <select id="grid-size">
+                        <option value="5" selected>5x5 (25 points)</option>
+                        <option value="6">6x6 (36 points)</option>
+                        <option value="7">7x7 (49 points)</option>
+                        <option value="8">8x8 (64 points)</option>
+                        <option value="9">9x9 (81 points)</option>
+                        <option value="10">10x10 (100 points)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>&nbsp;</label>
+                    <button id="fetch-data">Fetch Data</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="map-container">
+                <div id="map"></div>
+                <!-- Legend for heatmap -->
+                <div id="legend" class="legend">
+                    <h4>Solar Radiation (kWh/m²/day)</h4>
+                    <div id="gradient"></div>
+                    <div>
+                        <span id="legend-min">0</span>
+                        <span id="legend-max" style="float: right;">10+</span>
+                    </div>
+                </div>
+            </div>
+            <div class="chart-container">
+                <div class="chart-section">
+                    <div class="chart-title">NASA POWER Variables</div>
+                    <div class="variable-category">
+                        <div class="category-title">Solar Radiation</div>
+                        <div class="variable-selector" id="solar-variables">
+                            <button class="variable-button selected" data-var="allsky_sfc_sw_dwn">All-Sky Surface SW
+                                Downward</button>
+                            <button class="variable-button" data-var="allsky_sfc_par_tot">All-Sky Surface PAR
+                                Total</button>
+                            <button class="variable-button" data-var="allsky_kt">All-Sky KT</button>
+                        </div>
+                    </div>
+                    <div class="variable-category">
+                        <div class="category-title">Temperature</div>
+                        <div class="variable-selector" id="temp-variables">
+                            <button class="variable-button" data-var="ts_adj">Surface Temperature</button>
+                        </div>
+                    </div>
+                    <div class="variable-info">
+                        <div><strong>Selected Variable:</strong> <span id="selected-var-name">All-Sky Surface SW
+                                Downward</span></div>
+                        <div class="variable-description" id="var-description">
+                            All-sky surface shortwave downward irradiance is the total solar radiation reaching the
+                            Earth's surface under all sky conditions.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-section">
+                    <div class="chart-title">Solar Visualization</div>
+                    <div class="solar-viz" id="solar-viz">
+                        <div class="sun" id="sun"></div>
+                        <div class="solar-panel" id="solar-panel"></div>
+                        <div class="ground"></div>
+                    </div>
+                    <div style="text-align: center; font-size: 0.9em;">
+                        <div>Current Value: <span id="current-solar-value">5.2 kWh/m²/day</span></div>
+                        <div>Solar Panel Output: <span id="solar-output">4.16 kWh/day</span> (80% efficiency)</div>
+                    </div>
+                </div>
+
+                <div class="chart-section">
+                    <div class="chart-title">Time Series Data</div>
+                    <div class="aggregation-controls">
+                        <span>View Mode:</span>
+                        <div class="radio-group">
+                            <label class="radio-label">
+                                <input type="radio" name="view-mode" value="monthly" checked>
+                                Monthly
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="view-mode" value="average">
+                                Regional Average
+                            </label>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="time-series-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-section">
+                    <div class="chart-title">Monthly Averages</div>
+                    <div class="chart-wrapper">
+                        <canvas id="monthly-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-section" id="stats-section">
+                    <div class="chart-title">Statistics</div>
+                    <div class="stats-panel">
+                        <div class="stats-grid">
+                            <div class="stat-box">
+                                <div>Average Value</div>
+                                <div class="stat-value" id="avg-value">-</div>
+                                <div>kWh/m²/day</div>
+                            </div>
+                            <div class="stat-box">
+                                <div>Maximum Value</div>
+                                <div class="stat-value" id="max-value">-</div>
+                                <div>kWh/m²/day</div>
+                            </div>
+                            <div class="stat-box">
+                                <div>Minimum Value</div>
+                                <div class="stat-value" id="min-value">-</div>
+                                <div>kWh/m²/day</div>
+                            </div>
+                            <div class="stat-box">
+                                <div>Annual Total</div>
+                                <div class="stat-value" id="total-value">-</div>
+                                <div>kWh/m²/year</div>
+                            </div>
+                            <div class="stat-box">
+                                <div>Sunny Days</div>
+                                <div class="stat-value" id="sunny-days">-</div>
+                                <div>days</div>
+                            </div>
+                            <div class="stat-box">
+                                <div>Cloudy Days</div>
+                                <div class="stat-value" id="cloudy-days">-</div>
+                                <div>days</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mapbox token - replace with your token
+        mapboxgl.accessToken = 'pk.eyJ1IjoiaGFyc2hpdGFheSIsImEiOiJjbTl1b2FqMWwwYmx6Mm1vc2dsbjJuMDV5In0.zqokH_McYJWSzh8hAmu6bw';
+
+        // Global variables
+        let map;
+        let markers = [];
+        let climateData = null;
+        let selectedPointIndex = -1;
+        let timeSeriesChart = null;
+        let monthlyChart = null;
+        let heatmapLayer = null;
+        let selectedVariable = "allsky_sfc_sw_dwn";
+
+        // Default bbox coordinates (covering parts of Africa and South America)
+        const DEFAULT_MIN_LAT = -39.020;
+        const DEFAULT_MIN_LON = -94.187;
+        const DEFAULT_MAX_LAT = 18.229;
+        const DEFAULT_MAX_LON = 37.062;
+
+        // Variable metadata
+        const variableInfo = {
+            "allsky_sfc_sw_dwn": {
+                name: "All-Sky Surface SW Downward",
+                description: "All-sky surface shortwave downward irradiance is the total solar radiation reaching the Earth's surface under all sky conditions.",
+                unit: "kWh/m²/day",
+                thresholds: { low: 2, high: 6 }
+            },
+            "allsky_sfc_par_tot": {
+                name: "All-Sky Surface PAR Total",
+                description: "Photosynthetically Active Radiation (PAR) is the spectral range that plants can use for photosynthesis.",
+                unit: "kWh/m²/day",
+                thresholds: { low: 1, high: 4 }
+            },
+            "allsky_kt": {
+                name: "All-Sky KT",
+                description: "All-sky KT (clearness index) is the ratio of surface solar radiation to the solar radiation at the top of the atmosphere.",
+                unit: "index",
+                thresholds: { low: 0.3, high: 0.7 }
+            },
+            "ts_adj": {
+                name: "Surface Temperature",
+                description: "Surface temperature adjusted for local conditions, including elevation and terrain effects.",
+                unit: "°C",
+                thresholds: { low: 15, high: 30 }
+            }
+        };
+
+        // Initialize date inputs
+        function setDefaultDates() {
+            const today = new Date();
+            const fourMonthsAgo = new Date();
+            fourMonthsAgo.setMonth(today.getMonth() - 4);
+
+            document.getElementById('end-date').value = formatDate(today);
+            document.getElementById('start-date').value = formatDate(fourMonthsAgo);
+        }
+
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        // Initialize charts
+        function initCharts() {
+            const timeSeriesCtx = document.getElementById('time-series-chart').getContext('2d');
+            timeSeriesChart = new Chart(timeSeriesCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: []
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: variableInfo[selectedVariable].unit
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            },
+                            ticks: {
+                                autoSkip: true,
+                                maxTicksLimit: 12
+                            }
+                        }
+                    }
+                }
+            });
+
+            const monthlyCtx = document.getElementById('monthly-chart').getContext('2d');
+            monthlyChart = new Chart(monthlyCtx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Monthly Average',
+                        data: [],
+                        backgroundColor: 'rgba(255, 152, 0, 0.5)',
+                        borderColor: 'rgba(255, 152, 0, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: variableInfo[selectedVariable].unit
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Month'
+                            },
+                            ticks: {
+                                autoSkip: true,
+                                maxTicksLimit: 12
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize heatmap legend
+        function initLegend() {
+            const legend = document.getElementById('legend');
+            const gradient = document.getElementById('gradient');
+
+            // Create color gradient for the legend
+            const colors = [
+                'rgba(0, 0, 255, 0)',      // Transparent blue (for 0)
+                'rgba(0, 130, 255, 0.6)',  // Light blue
+                'rgba(0, 255, 255, 0.6)',  // Cyan
+                'rgba(0, 255, 130, 0.6)',  // Teal
+                'rgba(0, 255, 0, 0.6)',    // Green
+                'rgba(130, 255, 0, 0.6)',  // Lime
+                'rgba(255, 255, 0, 0.6)',  // Yellow
+                'rgba(255, 165, 0, 0.6)',  // Orange
+                'rgba(255, 80, 0, 0.6)',   // Dark orange
+                'rgba(255, 0, 0, 0.6)'     // Red
+            ];
+
+            const linearGradient = `linear-gradient(to right, ${colors.join(', ')})`;
+            gradient.style.background = linearGradient;
+
+            document.getElementById('legend-min').textContent = '0';
+            document.getElementById('legend-max').textContent = '10+';
+        }
+
+        // Fetch climate data
+        async function fetchClimateData() {
+            showLoading(true);
+
+            // Validate date range (max 4 months)
+            const startDate = new Date(document.getElementById('start-date').value);
+            const endDate = new Date(document.getElementById('end-date').value);
+
+            // Calculate difference in months
+            const monthsDiff = (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+                (endDate.getMonth() - startDate.getMonth());
+
+            if (monthsDiff > 4) {
+                alert('Please select a date range of 4 months or less to avoid UI overload.');
+                showLoading(false);
+                return;
+            }
+
+            const startDateStr = document.getElementById('start-date').value;
+            const endDateStr = document.getElementById('end-date').value;
+            const gridSize = document.getElementById('grid-size').value;
+
+            try {
+                console.log(`Fetching NASA POWER data from ${startDateStr} to ${endDateStr} with grid size ${gridSize}`);
+
+                // Using default bbox
+                const response = await fetch(`/climate-data-grid-samples/?min_lat=${DEFAULT_MIN_LAT}&min_lon=${DEFAULT_MIN_LON}&max_lat=${DEFAULT_MAX_LAT}&max_lon=${DEFAULT_MAX_LON}&start_date=${startDateStr}&end_date=${endDateStr}&data_source=np&variable=${selectedVariable}&grid_size=${gridSize}`);
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch data from API');
+                }
+
+                climateData = await response.json();
+
+                if (!climateData.points || climateData.points.length === 0) {
+                    throw new Error('No data points found in the selected area');
+                }
+
+                console.log('Data received:', climateData);
+
+                // Update map and charts
+                updateMapMarkers();
+                updateSolarViz();
+                updateHeatmap();
+
+                // Select the regional average by default
+                selectPoint(-1);
+
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+                console.error(error);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Update the heatmap
+        function updateHeatmap() {
+            if (!climateData || !climateData.points || climateData.points.length === 0) return;
+
+            // Remove existing heatmap layer
+            if (map.getSource('heatmap-source')) {
+                map.removeLayer('heatmap-layer');
+                map.removeSource('heatmap-source');
+            }
+
+            // Create features from points
+            const features = [];
+            climateData.points.forEach(point => {
+                // Get average value for this point
+                const values = point.values.map(v => v.values[selectedVariable]).filter(v => v !== undefined);
+                if (values.length === 0) return;
+
+                const avgValue = values.reduce((sum, val) => sum + val, 0) / values.length;
+
+                features.push({
+                    type: 'Feature',
+                    properties: {
+                        value: avgValue
+                    },
+                    geometry: {
+                        type: 'Point',
+                        coordinates: [point.lon, point.lat]
+                    }
+                });
+            });
+
+            // Add source and layer
+            map.addSource('heatmap-source', {
+                type: 'geojson',
+                data: {
+                    type: 'FeatureCollection',
+                    features: features
+                }
+            });
+
+            // Find max value for scaling
+            const maxValue = Math.max(...features.map(f => f.properties.value));
+
+            // Add heatmap layer
+            map.addLayer({
+                id: 'heatmap-layer',
+                type: 'heatmap',
+                source: 'heatmap-source',
+                paint: {
+                    // Increase the heatmap weight based on value
+                    'heatmap-weight': [
+                        'interpolate',
+                        ['linear'],
+                        ['get', 'value'],
+                        0, 0,
+                        maxValue, 1
+                    ],
+                    // Increase the heatmap intensity
+                    'heatmap-intensity': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        0, 2,
+                        9, 5
+                    ],
+                    // Color ramp for heatmap
+                    'heatmap-color': [
+                        'interpolate',
+                        ['linear'],
+                        ['heatmap-density'],
+                        0, 'rgba(0, 0, 255, 0)',
+                        0.1, 'rgba(0, 130, 255, 0.6)',
+                        0.2, 'rgba(0, 255, 255, 0.6)',
+                        0.3, 'rgba(0, 255, 130, 0.6)',
+                        0.4, 'rgba(0, 255, 0, 0.6)',
+                        0.5, 'rgba(130, 255, 0, 0.6)',
+                        0.6, 'rgba(255, 255, 0, 0.6)',
+                        0.7, 'rgba(255, 200, 0, 0.6)',
+                        0.8, 'rgba(255, 165, 0, 0.6)',
+                        0.9, 'rgba(255, 80, 0, 0.6)',
+                        1, 'rgba(255, 0, 0, 0.6)'
+                    ],
+                    // Adjust the heatmap radius for smoother appearance
+                    'heatmap-radius': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        0, 50,
+                        3, 75,
+                        6, 100,
+                        9, 150
+                    ],
+                    // Keep the heatmap fully visible
+                    'heatmap-opacity': 0.8
+                }
+            });
+
+            // Update legend
+            document.getElementById('legend-max').textContent = `${Math.ceil(maxValue)}+ ${variableInfo[selectedVariable].unit.split('/')[0]}`;
+            document.querySelector('.legend h4').textContent = `${variableInfo[selectedVariable].name} (${variableInfo[selectedVariable].unit})`;
+        }
+
+        // Update solar visualization
+        function updateSolarViz() {
+            if (!climateData || !climateData.average_series || climateData.average_series.length === 0) return;
+
+            // Get the average value for the selected variable
+            const values = climateData.average_series.map(d => d.values[selectedVariable]).filter(v => v !== undefined);
+            if (values.length === 0) return;
+
+            const avgValue = values.reduce((sum, val) => sum + val, 0) / values.length;
+
+            // Update current value display
+            document.getElementById('current-solar-value').textContent = `${avgValue.toFixed(2)} ${variableInfo[selectedVariable].unit}`;
+
+            // Calculate solar panel output (simulated 80% efficiency)
+            const efficiency = 0.8;
+            const output = avgValue * efficiency;
+            document.getElementById('solar-output').textContent = `${output.toFixed(2)} ${variableInfo[selectedVariable].unit}`;
+
+            // Update solar visualization
+            const solarViz = document.getElementById('solar-viz');
+            const sun = document.getElementById('sun');
+            const solarPanel = document.getElementById('solar-panel');
+
+            // Clear existing rays
+            document.querySelectorAll('.ray').forEach(ray => ray.remove());
+
+            // Position the sun based on the value (higher value = higher sun position)
+            // Position the sun based on the value (higher value = higher sun position)
+                    const thresholds = variableInfo[selectedVariable].thresholds;
+                    const normalizedValue = Math.min(Math.max((avgValue - thresholds.low) / (thresholds.high - thresholds.low), 0), 1);
+                    const sunPosY = 100 - (normalizedValue * 80); // Higher value = higher sun (lower Y position)
+
+                    sun.style.left = '20px';
+                    sun.style.top = `${sunPosY}px`;
+
+                    // Create sun rays
+                    const numRays = 8;
+                    for (let i = 0; i < numRays; i++) {
+                        const angle = (i / numRays) * Math.PI;
+                        const ray = document.createElement('div');
+                        ray.className = 'ray';
+
+                        // Set ray properties
+                        const rayLength = 60 + (normalizedValue * 40); // Longer rays for higher values
+                        ray.style.width = `${rayLength}px`;
+                        ray.style.left = '40px'; // Middle of sun
+                        ray.style.top = `${sunPosY + 20}px`; // Middle of sun
+                        ray.style.transform = `rotate(${angle}rad)`;
+                        ray.style.opacity = 0.3 + (normalizedValue * 0.7); // More opaque for higher values
+
+                        solarViz.appendChild(ray);
+                    }
+
+                    // Adjust solar panel tilt based on sun position
+                    const tiltAngle = 30 - (normalizedValue * 15); // Less tilt when sun is higher
+                    solarPanel.style.transform = `translateX(-50%) rotate(${tiltAngle}deg)`;
+                }
+
+                // Update map markers
+                function updateMapMarkers() {
+                    // Clear existing markers
+                    markers.forEach(marker => marker.remove());
+                    markers = [];
+
+                    if (!climateData || !climateData.points || climateData.points.length === 0) return;
+
+                    // Add new markers for each point
+                    climateData.points.forEach((point, index) => {
+                        const el = document.createElement('div');
+                        el.className = 'map-point';
+                        el.addEventListener('click', () => selectPoint(index));
+
+                        const marker = new mapboxgl.Marker(el)
+                            .setLngLat([point.lon, point.lat])
+                            .addTo(map);
+
+                        markers.push(marker);
+                    });
+
+                    // Fit map to points
+                    const bounds = new mapboxgl.LngLatBounds();
+                    climateData.points.forEach(point => {
+                        bounds.extend([point.lon, point.lat]);
+                    });
+                    map.fitBounds(bounds, { padding: 50 });
+                }
+
+                // Select a point and update charts
+                function selectPoint(index) {
+                    selectedPointIndex = index;
+
+                    const pointData = index >= 0 ? climateData.points[index] : null;
+                    const pointName = pointData ? `Point ${index + 1} (${pointData.lat.toFixed(2)}, ${pointData.lon.toFixed(2)})` : 'Regional Average';
+
+                    // Update time series chart
+                    updateTimeSeriesChart(pointName);
+
+                    // Update monthly chart
+                    updateMonthlyChart(pointName);
+
+                    // Update statistics
+                    updateStatistics();
+
+                    // Highlight selected point marker
+                    markers.forEach((marker, i) => {
+                        const el = marker.getElement();
+                        if (i === index) {
+                            el.style.backgroundColor = '#1a237e';
+                            el.style.width = '12px';
+                            el.style.height = '12px';
+                            el.style.zIndex = 100;
+                        } else {
+                            el.style.backgroundColor = '#ff9800';
+                            el.style.width = '8px';
+                            el.style.height = '8px';
+                            el.style.zIndex = 1;
+                        }
+                    });
+                }
+
+                // Update time series chart
+                function updateTimeSeriesChart(pointName) {
+                    if (!timeSeriesChart) return;
+
+                    // Get data series (either selected point or regional average)
+                    const seriesData = selectedPointIndex >= 0 ?
+                        climateData.points[selectedPointIndex].values :
+                        climateData.average_series;
+
+                    if (!seriesData || seriesData.length === 0) return;
+
+                    // Get view mode (monthly or daily)
+                    const viewMode = document.querySelector('input[name="view-mode"]:checked').value;
+
+                    // Process data based on view mode
+                    let labels = [];
+                    let data = [];
+
+                    if (viewMode === 'monthly') {
+                        // Group by month and calculate averages
+                        const monthlyData = {};
+
+                        seriesData.forEach(point => {
+                            const date = new Date(point.date);
+                            const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
+
+                            if (!monthlyData[monthKey]) {
+                                monthlyData[monthKey] = {
+                                    count: 0,
+                                    sum: 0,
+                                    display: `${date.toLocaleString('default', { month: 'short' })} ${date.getFullYear()}`
+                                };
+                            }
+
+                            if (point.values[selectedVariable] !== undefined) {
+                                monthlyData[monthKey].sum += point.values[selectedVariable];
+                                monthlyData[monthKey].count++;
+                            }
+                        });
+
+                        // Convert to arrays for Chart.js
+                        Object.keys(monthlyData).sort().forEach(month => {
+                            const avg = monthlyData[month].count > 0 ?
+                                monthlyData[month].sum / monthlyData[month].count : 0;
+
+                            labels.push(monthlyData[month].display);
+                            data.push(avg);
+                        });
+                    } else {
+                        // Use daily data
+                        seriesData.forEach(point => {
+                            if (point.values[selectedVariable] !== undefined) {
+                                const date = new Date(point.date);
+                                labels.push(date.toLocaleDateString());
+                                data.push(point.values[selectedVariable]);
+                            }
+                        });
+                    }
+
+                    // Update chart
+                    timeSeriesChart.data.labels = labels;
+                    timeSeriesChart.data.datasets = [{
+                        label: `${variableInfo[selectedVariable].name} (${pointName})`,
+                        data: data,
+                        backgroundColor: 'rgba(26, 35, 126, 0.2)',
+                        borderColor: 'rgba(26, 35, 126, 1)',
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        tension: 0.3
+                    }];
+
+                    timeSeriesChart.options.scales.y.title.text = variableInfo[selectedVariable].unit;
+                    timeSeriesChart.update();
+                }
+
+                // Update monthly chart (annual pattern)
+                function updateMonthlyChart(pointName) {
+                    if (!monthlyChart) return;
+
+                    // Get data series (either selected point or regional average)
+                    const seriesData = selectedPointIndex >= 0 ?
+                        climateData.points[selectedPointIndex].values :
+                        climateData.average_series;
+
+                    if (!seriesData || seriesData.length === 0) return;
+
+                    // Group by month (regardless of year) and calculate averages
+                    const monthlyData = Array(12).fill().map(() => ({ sum: 0, count: 0 }));
+
+                    seriesData.forEach(point => {
+                        if (point.values[selectedVariable] !== undefined) {
+                            const date = new Date(point.date);
+                            const month = date.getMonth();
+                            monthlyData[month].sum += point.values[selectedVariable];
+                            monthlyData[month].count++;
+                        }
+                    });
+
+                    // Calculate averages and prepare data for chart
+                    const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    const data = monthlyData.map(month => month.count > 0 ? month.sum / month.count : 0);
+
+                    // Update chart
+                    monthlyChart.data.labels = labels;
+                    monthlyChart.data.datasets[0].data = data;
+                    monthlyChart.data.datasets[0].label = `Monthly Average (${pointName})`;
+                    monthlyChart.options.scales.y.title.text = variableInfo[selectedVariable].unit;
+                    monthlyChart.update();
+                }
+
+                // Update statistics panel
+                function updateStatistics() {
+                    // Get data series (either selected point or regional average)
+                    const seriesData = selectedPointIndex >= 0 ?
+                        climateData.points[selectedPointIndex].values :
+                        climateData.average_series;
+
+                    if (!seriesData || seriesData.length === 0) return;
+
+                    // Extract values for the selected variable
+                    const values = seriesData
+                        .map(point => point.values[selectedVariable])
+                        .filter(val => val !== undefined);
+
+                    if (values.length === 0) return;
+
+                    // Calculate statistics
+                    const avg = values.reduce((sum, val) => sum + val, 0) / values.length;
+                    const max = Math.max(...values);
+                    const min = Math.min(...values);
+                    const total = avg * 365; // Approximate annual total
+
+                    // Count sunny vs cloudy days (simplified heuristic)
+                    const sunnyThreshold = variableInfo[selectedVariable].thresholds.high * 0.7;
+                    const cloudyThreshold = variableInfo[selectedVariable].thresholds.low * 1.3;
+
+                    const sunnyDays = values.filter(val => val >= sunnyThreshold).length;
+                    const cloudyDays = values.filter(val => val <= cloudyThreshold).length;
+
+                    // Update DOM elements
+                    document.getElementById('avg-value').textContent = avg.toFixed(2);
+                    document.getElementById('max-value').textContent = max.toFixed(2);
+                    document.getElementById('min-value').textContent = min.toFixed(2);
+                    document.getElementById('total-value').textContent = total.toFixed(2);
+                    document.getElementById('sunny-days').textContent = sunnyDays;
+                    document.getElementById('cloudy-days').textContent = cloudyDays;
+                }
+
+                // Show/hide loading indicator
+                function showLoading(show) {
+                    document.getElementById('loading').style.display = show ? 'flex' : 'none';
+                }
+
+                // Variable selector click handler
+                function setupVariableSelectors() {
+                    document.querySelectorAll('.variable-button').forEach(button => {
+                        button.addEventListener('click', () => {
+                            // Update selected state
+                            document.querySelectorAll('.variable-button').forEach(b => b.classList.remove('selected'));
+                            button.classList.add('selected');
+
+                            // Update selected variable
+                            selectedVariable = button.getAttribute('data-var');
+
+                            // Update variable info
+                            document.getElementById('selected-var-name').textContent = variableInfo[selectedVariable].name;
+                            document.getElementById('var-description').textContent = variableInfo[selectedVariable].description;
+
+                            // Update charts and visualization if data is available
+                            if (climateData) {
+                                updateSolarViz();
+                                updateTimeSeriesChart(selectedPointIndex >= 0 ?
+                                    `Point ${selectedPointIndex + 1}` : 'Regional Average');
+                                updateMonthlyChart(selectedPointIndex >= 0 ?
+                                    `Point ${selectedPointIndex + 1}` : 'Regional Average');
+                                updateStatistics();
+                                updateHeatmap();
+                            }
+                        });
+                    });
+                }
+
+                // Initialize the application
+                function init() {
+                    // Initialize map
+                    map = new mapboxgl.Map({
+                        container: 'map',
+                        style: 'mapbox://styles/mapbox/light-v11',
+                        center: [0, 0],
+                        zoom: 1
+                    });
+
+                    // Add navigation controls
+                    map.addControl(new mapboxgl.NavigationControl());
+
+                    // Initialize date inputs
+                    setDefaultDates();
+
+                    // Initialize legend
+                    initLegend();
+
+                    // Initialize charts
+                    initCharts();
+
+                    // Setup event listeners
+                    document.getElementById('fetch-data').addEventListener('click', fetchClimateData);
+
+                    // Setup variable selectors
+                    setupVariableSelectors();
+
+                    // Setup view mode radio buttons
+                    document.querySelectorAll('input[name="view-mode"]').forEach(radio => {
+                        radio.addEventListener('change', () => {
+                            if (climateData) {
+                                updateTimeSeriesChart(selectedPointIndex >= 0 ?
+                                    `Point ${selectedPointIndex + 1}` : 'Regional Average');
+                            }
+                        });
+                    });
+
+                    // Wait for map to load before fetching initial data
+                    map.on('load', () => {
+                        // Fetch initial data
+                        fetchClimateData();
+                    });
+                }
+
+                // Start the application
+                document.addEventListener('DOMContentLoaded', init);
+            </script>
+    </body>
+    
+    </html>

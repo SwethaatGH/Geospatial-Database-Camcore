@@ -129,6 +129,23 @@
             padding: 10px;
             margin: 15px 0;
         }
+
+        #checkbox-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .source-group {
+            flex: 1 1 300px; /* Responsive width */
+            min-width: 280px;
+            max-width: 350px;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            padding: 12px;
+            border-radius: 6px;
+        }
+
     </style>
 </head>
 <body>
@@ -156,6 +173,18 @@
         <div class="options hidden" id="options-section">
             <h3>Processing Options</h3>
             <p>What would you like to generate?</p>
+
+            <div id="data-source-checkboxes">
+
+                <button id="toggle-checkboxes-btn" type="button" style="margin-bottom: 10px;">
+                Unselect All
+                </button>
+
+                <h4>Select Data Sources and Variables:</h4>
+                <div id="checkbox-container"></div>
+
+                
+            </div>
             
             <label>
                 <input type="radio" name="process-option" value="raw" checked> 
@@ -195,6 +224,161 @@
             const downloadButtons = document.getElementById('download-buttons');
             
             let uploadedFile = null;
+
+            const toggleButton = document.getElementById('toggle-checkboxes-btn');
+            let allChecked = true;  // start with everything checked by default
+
+            toggleButton.addEventListener('click', () => {
+                const checkboxes = document.querySelectorAll('input.variable-checkbox, input.master-checkbox');
+                checkboxes.forEach(cb => cb.checked = !allChecked);
+                allChecked = !allChecked;
+                toggleButton.textContent = allChecked ? "Unselect All" : "Select All";
+            });
+            
+            const checkboxContainer = document.getElementById('checkbox-container');
+
+            const dataSourceLabels = {
+                wc: "WorldClim",
+                spei: "SPEI",
+                chirps: "CHIRPS",
+                era5: "ERA5-Land",
+                et: "ET",
+                elev: "Elevation",
+                soil: "SoilGrids",
+                tc: "TerraClim",
+                np: "NASA POWER",
+                bio: "Bioclim",
+                koppen: "Koppen",
+                brazil: "Brazilian Gridded"
+            };
+
+            const variableLabels = {
+                // WorldClim
+                prec: "Precipitation",
+                tmax: "Max Temperature",
+                tmin: "Min Temperature",
+                // SPEI
+                spei: "SPEI",
+                // CHIRPS
+                chirps: "Precipitation",
+                // ET
+                et: "Evapotranspiration",
+                // Elevation
+                elev: "Elevation", slope: "Slope", aspect: "Aspect", tpi: "Topographic Position Index", hand: "Height Above Nearest Drainage",
+                tri: "Terrain Ruggedness Index", roughness: "Roughness", flowdir: "Flow Direction", hillshade: "Hillshade",
+                // SoilGrids
+                bdod: "Bulk Density", cec: "Cation Exchange Capacity", cfvo: "Coarse Fragments Volumetric",
+                clay: "Clay Content", nitrogen: "Nitrogen", ocd: "Organic Carbon Density", ocs: "Organic Carbon Stock",
+                phh2o: "pH in H2O", sand: "Sand Content", silt: "Silt Content", soc: "Soil Organic Carbon",
+                wv0010: "Water Vapor 10cm", wv0030: "Water Vapor 30cm", wv1500: "Water Vapor 1500cm",
+                // TerraClim
+                aet: "Actual Evapotranspiration", def: "Water Deficit", pdsi: "PDSI", pet: "Potential Evapotranspiration",
+                ppt: "Precipitation", q: "Runoff", soil: "Soil Moisture", srad: "Solar Radiation",
+                vap: "Vapor Pressure", vpd: "Vapor Pressure Deficit", ws: "Wind Speed",
+                // NASA POWER (partial list; you can add more)
+                airmass: "Air Mass", allsky_kt: "All-Sky Kt", allsky_nkt: "All-Sky NKt", allsky_sfc_lw_dwn: "All-Sky Surface LW Down",
+                allsky_sfc_lw_up: "All-Sky Surface LW Up", allsky_sfc_par_diff: "All-Sky Surface PAR Diffuse", allsky_sfc_par_dirh: "All-Sky Surface PAR Direct Horizontal",
+                allsky_sfc_par_tot: "All-Sky Surface PAR Total", allsky_sfc_sw_diff: "All-Sky Surface SW Diffuse", allsky_sfc_sw_dirh: "All-Sky Surface SW Direct Horizontal",
+                allsky_sfc_sw_dni: "All-Sky Surface SW DNI", allsky_sfc_sw_dwn: "All-Sky Surface SW Down", allsky_sfc_sw_up: "All-Sky Surface SW Up", 
+                allsky_sfc_uv_index: "All-Sky Surface UV Index", allsky_sfc_uva: "All-Sky Surface UVA", allsky_sfc_uvb: "All-Sky Surface UVB", allsky_srf_alb: "All-Sky Surface Albedo",
+                midday_insol: "Midday Insolation", original_allsky_sfc_sw_diff: "Original All-Sky Surface SW Diffuse",
+                original_allsky_sfc_sw_dirh: "Original All-Sky Surface SW Direct Horizontal", psh: "Peak Sun Hours", pw: "Precipitable Water",
+                srf_alb_adj: "Surface Albedo Adjusted", toa_sw_dni: "TOA SW DNI", toa_sw_dwn: "TOA SW Down", ts_adj: "Temperature Adjusted", 
+                // ERA5
+                evaptrans: "Evapotranspiration", latheat: "Latent Heat", netsolrad: "Net Solar Radiation", press: "Pressure",
+                sktemp: "Skin Temperature", sotemp1: "Soil Temp L1", sotemp2: "Soil Temp L2", sotemp3: "Soil Temp L3",
+                temp: "Temperature", totprec: "Total Precipitation", uwind: "U-Wind", vwind: "V-Wind",
+                volsowat1: "Soil Water Vol L1", volsowat12: "Soil Water Vol L2", volsowat13: "Soil Water Vol L3",
+                // Bioclim
+                bio1: "Annual Mean Temperature (BIO1)", bio2: "Mean Diurnal Range (BIO2)", bio3: "Isothermality (BIO3)",
+                bio4: "Temperature Seasonality (BIO4)", bio5: "Max Temperature of Warmest Month (BIO5)", bio6: "Min Temperature of Coldest Month (BIO6)",
+                bio7: "Temperature Annual Range (BIO7)", bio8: "Mean Temperature of Wettest Quarter (BIO8)", bio9: "Mean Temperature of Driest Quarter (BIO9)",
+                bio10: "Mean Temperature of Warmest Quarter (BIO10)", bio11: "Mean Temperature of Coldest Quarter (BIO11)", bio12: "Annual Precipitation (BIO12)",
+                bio13: "Precipitation of Wettest Month (BIO13)", bio14: "Precipitation of Driest Month (BIO14)", bio15: "Precipitation Seasonality (BIO15)",
+                bio16: "Precipitation of Wettest Quarter (BIO16)", bio17: "Precipitation of Driest Quarter (BIO17)", bio18: "Precipitation of Warmest Quarter (BIO18)",
+                bio19: "Precipitation of Coldest Quarter (BIO19)",
+                // Koppen
+                af: "Tropical Rainforest (Af)", am: "Tropical Monsoon (Am)", aw: "Tropical Savanna (Aw)",
+                bwh: "Hot Desert (BWh)", bwk: "Cold Desert (BWk)", bsh: "Hot Steppe (BSh)", bsk: "Cold Steppe (BSk)",
+                csa: "Dry - Hot Summer (Csa)", csb: "Dry - Warm Summer (Csb)", csc: "Dry - Cold Summer (Csc)",
+                cfa: "Monsoonal - Hot Summer (Cfa)", cfb: "Monsoonal - Warm Summer (Cfb)", cfc: "Monsoonal - Cool Summer (Cfc)",
+                cwa: "Dry Winter - Hot Summer (Cwa)", cwb: "Dry Winter - Warm Summer (Cwb)", cwc: "Dry Winter - Cool Summer (Cwc)",
+                dsa: "Boreal - Dry Summer, Hot Summer (Dsa)", dsb: "Boreal - Dry Summer, Warm Summer (Dsb)", dsc: "Boreal - Dry Summer, Cool Summer  (Dsc)",
+                dfa: "Boreal - No Dry Season, Hot Summer (Dfa)", dfb: "Boreal - No Dry Season, Warm Summer (Dfb)", dfc: "Boreal - No Dry Season, Cool Summer", dfd: "Boreal - No Dry Season, Very Cold Winter (Dfd)",
+                dwa: "Boreal - Dry Winter, Hot Summer (Dwa)", dwb: "Boreal - Dry Winter, Warm Summer (Dwb)", dwc: "Boreal - Dry Winter, Cool Summer (Dwc)", dwd: "Boreal - Dry Winter, Very Cold Winter (Dwd)",
+                ef: "Frost (EF)",
+                all: "All Zones Combined (All)",
+                // Brazil
+                eto: "Evapotranspiration", rh: "Relative Humidity", rs: "Solar Radiation", tmax: "Maximum Temperature",
+                tmin: "Minimum Temperature", pr: "Precipitation", u2: "Wind Speed"
+
+            };
+
+
+
+            const dataSources = {
+                wc: ["prec", "tmax", "tmin"],
+                spei: ["spei"],
+                chirps: ["chirps"],
+                et: ["et"],
+                elev: ["aspect", "elev", "flowdir", "hillshade", "roughness", "tpi", "tri", "slope", "hand"],
+                soil: ["bdod", "cec", "cfvo", "clay", "nitrogen", "ocd", "ocs", "phh2o", "sand", "silt", "soc", "wv0010", "wv0030", "wv1500"],
+                tc: ["aet", "def", "pdsi", "pet", "ppt", "q", "soil", "srad", "tmax", "tmin", "vap", "vpd", "ws"],
+                np: ["airmass", "allsky_kt", "allsky_nkt", "allsky_sfc_lw_dwn", "allsky_sfc_lw_up", "allsky_sfc_par_diff",
+                    "allsky_sfc_par_dirh", "allsky_sfc_par_tot", "allsky_sfc_sw_diff", "allsky_sfc_sw_dirh", "allsky_sfc_sw_dni",
+                    "allsky_sfc_sw_dwn", "allsky_sfc_sw_up", "allsky_sfc_uv_index", "allsky_sfc_uva", "allsky_sfc_uvb",
+                    "allsky_srf_alb", "midday_insol", "original_allsky_sfc_sw_diff", "original_allsky_sfc_sw_dirh", "psh", "pw",
+                    "srf_alb_adj", "toa_sw_dni", "toa_sw_dwn", "ts_adj"],
+                era5: ["evaptrans", "latheat", "netsolrad", "press", "sktemp", "sotemp1", "sotemp2", "sotemp3", "temp", "totprec", "uwind", "vwind", "volsowat1", "volsowat12", "volsowat13"],
+                bio: ["bio1", "bio2", "bio3", "bio4", "bio5", "bio6", "bio7", "bio8", "bio9", "bio10", "bio11", "bio12", "bio13", "bio14", "bio15", "bio16", "bio17", "bio18", "bio19"],
+                koppen: ["bsh", "dfb", "cfc", "cfa", "ef", "cwc", "af", "et", "cwb", "cwa",
+                        "csc", "bwk", "aw", "bsk", "dsb", "csa", "all", "dwb", "am", "dfc",
+                        "dwc", "cfb", "bwh", "csb", "dsc"],
+                brazil: ["eto", "pr", "tmax", "tmin", "rh", "u2", "rs"]
+            };
+
+            for (const source in dataSources) {
+                const group = document.createElement('div');
+                group.className = 'source-group';
+                
+                const sourceLabel = document.createElement('label');
+                const sourceCheckbox = document.createElement('input');
+                sourceCheckbox.type = 'checkbox';
+                sourceCheckbox.checked = true;
+                sourceCheckbox.style.marginRight = '6px';
+                sourceCheckbox.className = 'master-checkbox';
+
+                const displayName = dataSourceLabels[source] || source;
+                sourceLabel.appendChild(sourceCheckbox);
+                sourceLabel.append(document.createTextNode(` ${displayName}:`));
+                group.appendChild(sourceLabel);
+
+                sourceCheckbox.addEventListener('change', () => {
+                    const checkboxes = group.querySelectorAll('input.variable-checkbox');
+                    checkboxes.forEach(cb => cb.checked = sourceCheckbox.checked);
+                });
+
+                dataSources[source].forEach(variable => {
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.name = 'variable-checkbox';
+                    checkbox.value = `${source}:${variable}`;
+                    checkbox.checked = true;
+                    checkbox.className = 'variable-checkbox';
+
+                    const label = document.createElement('label');
+                    label.style.marginLeft = '10px';
+                    label.style.display = 'inline-block';
+                    label.appendChild(checkbox);
+                    label.append(` ${variableLabels[variable] || variable}`);
+
+                    group.appendChild(document.createElement('br'));
+                    group.appendChild(label);
+                });
+
+                checkboxContainer.appendChild(group);
+            }
+
             
             // Handle click on upload area
             uploadArea.addEventListener('click', function() {
@@ -262,6 +446,14 @@
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('option', option);
+
+                const selectedVars = [];
+                document.querySelectorAll('input[name="variable-checkbox"]:checked').forEach(cb => {
+                    selectedVars.push(cb.value);  // format: source:variable
+                });
+
+                formData.append('variables', JSON.stringify(selectedVars));
+
                 
                 // Send file to server
                 fetch('/api/process-csv', {

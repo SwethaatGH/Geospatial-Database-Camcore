@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHIRPS Precipitation Explorer with Kepler.gl</title>
+    <!-- Kepler.gl -->
+    <script src="https://unpkg.com/kepler.gl/dist/kepler.gl.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/kepler.gl/dist/kepler.gl.min.css" />
+    <!-- Mapbox GL -->
+    <script src='https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.css' rel='stylesheet' />
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: Arial, sans-serif;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .header {
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .map-container {
+            width: 100%;
+            position: relative;
+        }
+
+        #kepler-map {
+            width: 100%;
+            height: 100%;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            flex: 1;
+            min-width: 200px;
+            margin-bottom: 10px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        select,
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 8px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>CHIRPS Precipitation Explorer with Kepler.gl</h1>
+            <div class="controls">
+                <div class="form-group">
+                    <label for="start-date">Start Date:</label>
+                    <input type="date" id="start-date">
+                </div>
+                <div class="form-group">
+                    <label for="end-date">End Date:</label>
+                    <input type="date" id="end-date">
+                </div>
+                <div class="form-group">
+                    <label for="grid-size">Grid Size:</label>
+                    <select id="grid-size">
+                        <option value="5" selected>5x5 (25 points)</option>
+                        <option value="10">10x10 (100 points)</option>
+                        <option value="20">20x20 (400 points)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>&nbsp;</label>
+                    <button id="generate-heatmap">Generate Heatmap</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="map-container">
+                <div id="kepler-map"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Kepler.gl
+        let keplerMap;
+
+        async function fetchHeatmapData() {
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            const gridSize = document.getElementById('grid-size').value;
+
+            if (!startDate || !endDate) {
+                alert('Please select start and end dates.');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/climate-data-grid-heatmap/?min_lat=-39.020&min_lon=-94.187&max_lat=18.229&max_lon=37.062&start_date=${startDate}&end_date=${endDate}&data_source=chirps&variable=prec`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch heatmap data');
+                }
+
+                const data = await response.json();
+                renderKeplerMap(data.heatmap_frames, data.max_precip);
+            } catch (error) {
+                console.error('Error fetching heatmap data:', error);
+                alert('Failed to generate heatmap. Please try again.');
+            }
+        }
+
+        function renderKeplerMap(heatmapFrames, maxPrecip) {
+            const keplerConfig = {
+                datasets: [{
+                    info: {
+                        label: 'Precipitation Heatmap',
+                        id: 'heatmap-data'
+                    },
+                    data: {
+                        fields: [
+                            { name: 'lat', type: 'real' },
+                            { name: 'lon', type: 'real' },
+                            { name: 'value', type: 'real' }
+                        ],
+                        rows: heatmapFrames.flatMap(frame => frame.points.map(point => [point.lat, point.lon, point.value]))
+                    }
+                }],
+                config: {
+                    visState: {
+                        layers: [{
+                            id: 'heatmap-layer',
+                            type: 'heatmap',
+                            config: {
+                                dataId: 'heatmap-data',
+                                label: 'Heatmap',
+                                colorField: { name: 'value', type: 'real' },
+                                colorScale: 'quantile'
+                            }
+                        }]
+                    }
+                }
+            };
+
+            if (!keplerMap) {
+                keplerMap = new KeplerGl({
+                    container: 'kepler-map',
+                    mapboxApiAccessToken: 'pk.eyJ1IjoiaGFyc2hpdGFheSIsImEiOiJjbTl1b2FqMWwwYmx6Mm1vc2dsbjJuMDV5In0.zqokH_McYJWSzh8hAmu6bw'
+                });
+            }
+
+            keplerMap.update(keplerConfig);
+        }
+
+        document.getElementById('generate-heatmap').addEventListener('click', fetchHeatmapData);
+    </script>
+</body>
+
+</html>

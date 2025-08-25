@@ -163,109 +163,87 @@
             <div id="map"></div>
             <div class="controls">
                 <h3>Climate Data Explorer</h3>
-
                 <!-- Tabs for Point vs BBox mode -->
                 <div class="tab-container">
                     <div class="tab active" id="tab-point">Point Mode</div>
                     <div class="tab" id="tab-bbox">Bounding Box Mode</div>
                 </div>
-
                 <!-- Point Mode Content -->
                 <div class="tab-content active" id="content-point">
                     <div class="coordinates" id="selected-point">
                         <p>Click on the map to select a point.</p>
                     </div>
-
                     <label for="data-source-point">Data Source:</label>
                     <select id="data-source-point">
                         <option value="wc">WorldClim</option>
                         <option value="spei">SPEI</option>
                         <option value="chirps">CHIRPS</option>
+                        <option value="era5">Era5 Land</option>
                         <option value="et">ET</option>
                         <option value="elev">Elevation</option>
-                        <option value="sg">SoilGrids</option>
+                        <option value="soil">SoilGrids</option>
                         <option value="tc">TerraClim</option>
                         <option value="np">NASA POWER</option>
+                        <option value="bio">Bioclim</option>
+                        <option value="koppen">Koppen</option>
+                        <option value="brazil">Brazilian Grid</option>
                     </select>
-
                     <label for="variable-point">Variable:</label>
                     <select id="variable-point">
                         <option value="prec">Precipitation</option>
                         <option value="tmax">Max Temperature</option>
                         <option value="tmin">Min Temperature</option>
                     </select>
-
                     <div id="date-controls-point">
                         <label for="start-date">Start Date:</label>
                         <input type="date" id="start-date">
-
                         <label for="end-date">End Date:</label>
                         <input type="date" id="end-date">
                     </div>
-
                     <button id="fetch-point-data">Fetch Time Series Data</button>
                     <button id="clear-point-selection">Clear Selection</button>
                 </div>
-
                 <!-- Bounding Box Mode Content -->
                 <div class="tab-content" id="content-bbox">
                     <div class="coordinates" id="selected-bbox">
                         <p>Use the rectangle tool to draw a bounding box on the map.</p>
                     </div>
-
                     <label for="data-source-bbox">Data Source:</label>
                     <select id="data-source-bbox">
                         <option value="wc">WorldClim</option>
                         <option value="spei">SPEI</option>
                         <option value="chirps">CHIRPS</option>
+                        <option value="era5">Era5 Land</option>
                         <option value="et">ET</option>
                         <option value="elev">Elevation</option>
-                        <option value="sg">SoilGrids</option>
+                        <option value="soil">SoilGrids</option>
                         <option value="tc">TerraClim</option>
                         <option value="np">NASA POWER</option>
+                        <option value="bio">Bioclim</option>
+                        <option value="koppen">Koppen</option>
+                        <option value="brazil">Brazilian Grid</option>
                     </select>
-
                     <label for="variable-bbox">Variable:</label>
                     <select id="variable-bbox">
                         <option value="prec">Precipitation</option>
                         <option value="tmax">Max Temperature</option>
                         <option value="tmin">Min Temperature</option>
                     </select>
-
-                    <!-- <div id="date-controls-bbox">
-                        <label for="bbox-date">Date:</label>
-                        <input type="date" id="bbox-date">
-                    </div> -->
                     <div id="date-controls-bbox">
-                        <div id="bbox-single-date" style="display: block;">
-                            <label for="bbox-date">Date:</label>
-                            <input type="date" id="bbox-date">
-                        </div>
-                    
-                        <div id="bbox-time-series" style="display: none;">
+                        <div id="bbox-time-series" style="display: block;">
                             <label for="bbox-start-date">Start Date:</label>
                             <input type="date" id="bbox-start-date">
-                    
                             <label for="bbox-end-date">End Date:</label>
                             <input type="date" id="bbox-end-date">
                         </div>
-                    
-                        <div style="margin-top: 10px;">
-                            <input type="checkbox" id="bbox-time-series-toggle">
-                            <label for="bbox-time-series-toggle" style="display: inline;">Enable Time Series</label>
-                        </div>
                     </div>
-
-
                     <button id="fetch-bbox-data">Fetch Bounding Box Data</button>
                     <button id="clear-bbox-selection">Clear Selection</button>
-
                     <div id="points-info" style="display: none;">
                         <h4>Sample Points:</h4>
                         <p id="points-summary"></p>
                     </div>
                 </div>
-
                 <div id="loading" class="loading">Loading data...</div>
                 <div id="error" class="error"></div>
             </div>
@@ -276,7 +254,6 @@
             </div>
         </div>
     </div>
-
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.3/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     <script>
@@ -286,18 +263,14 @@
             [-39.020, -94.187], // Southwest corner (lat, lng)
             [18.229, 37.062]    // Northeast corner (lat, lng)
         ];
-
         const map = L.map('map').fitBounds(initialBbox);
-
         // Add OpenStreetMap tile layer
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
-
         // Initialize Leaflet Draw
         const drawnItems = new L.FeatureGroup();
         map.addLayer(drawnItems);
-
         const drawControl = new L.Control.Draw({
             draw: {
                 polyline: false,
@@ -318,7 +291,6 @@
             }
         });
         map.addControl(drawControl);
-
         // Variables to store selected data
         let selectedPoint = null;
         let selectedMarker = null;
@@ -326,7 +298,6 @@
         let bboxRectangle = null;
         let timeSeriesChart = null;
         let pointsData = null;
-
         // Tab switching functionality
         document.getElementById('tab-point').addEventListener('click', function () {
             document.getElementById('tab-point').classList.add('active');
@@ -334,42 +305,26 @@
             document.getElementById('content-point').classList.add('active');
             document.getElementById('content-bbox').classList.remove('active');
         });
-
         document.getElementById('tab-bbox').addEventListener('click', function () {
             document.getElementById('tab-point').classList.remove('active');
             document.getElementById('tab-bbox').classList.add('active');
             document.getElementById('content-point').classList.remove('active');
             document.getElementById('content-bbox').classList.add('active');
         });
-
         // Update variable dropdown based on selected data source (Point Mode)
         document.getElementById('data-source-point').addEventListener('change', function () {
             updateVariableDropdown(this.value, 'variable-point', 'date-controls-point');
         });
-
-        document.getElementById('bbox-time-series-toggle').addEventListener('change', function () {
-                if (this.checked) {
-                    document.getElementById('bbox-single-date').style.display = 'none';
-                    document.getElementById('bbox-time-series').style.display = 'block';
-                } else {
-                    document.getElementById('bbox-single-date').style.display = 'block';
-                    document.getElementById('bbox-time-series').style.display = 'none';
-                }
-            });
-
         // Update variable dropdown based on selected data source (BBox Mode)
         document.getElementById('data-source-bbox').addEventListener('change', function () {
             updateVariableDropdown(this.value, 'variable-bbox', 'date-controls-bbox');
         });
-
         // Function to update variable dropdown based on data source
         function updateVariableDropdown(dataSource, variableSelectId, dateControlsId) {
             const variableSelect = document.getElementById(variableSelectId);
             const dateControls = document.getElementById(dateControlsId);
-
             // Clear current options
             variableSelect.innerHTML = '';
-
             // Add appropriate options based on data source
             if (dataSource === 'wc') {
                 addOption(variableSelect, 'prec', 'Precipitation');
@@ -387,8 +342,75 @@
                 dateControls.style.display = 'block';
             } else if (dataSource === 'elev') {
                 addOption(variableSelect, 'elev', 'Elevation');
+                addOption(variableSelect, 'slope', 'Slope');
+                addOption(variableSelect, 'aspect', 'Aspect');
+                addOption(variableSelect, 'tpi', 'Topographic Position Index');
+                addOption(variableSelect, 'tri', 'Terrain Ruggedness Index');
+                addOption(variableSelect, 'roughness', 'Roughness');
+                addOption(variableSelect, 'flowdir', 'Flow Direction');
+                addOption(variableSelect, 'hillshade', 'Hillshade');
+                addOption(variableSelect, 'hand', 'Height Above Nearest Drainage');
                 dateControls.style.display = 'none';
-            } else if (dataSource === 'sg') {
+
+            } 
+            else if (dataSource === 'bio') {
+                addOption(variableSelect, 'bio1', 'Annual Mean Temperature (BIO1)');
+                addOption(variableSelect, 'bio2', 'Mean Diurnal Range (BIO2)');
+                addOption(variableSelect, 'bio3', 'Isothermality (BIO3)');
+                addOption(variableSelect, 'bio4', 'Temperature Seasonality (BIO4)');
+                addOption(variableSelect, 'bio5', 'Max Temperature of Warmest Month (BIO5)');
+                addOption(variableSelect, 'bio6', 'Min Temperature of Coldest Month (BIO6)');
+                addOption(variableSelect, 'bio7', 'Temperature Annual Range (BIO7)');
+                addOption(variableSelect, 'bio8', 'Mean Temp of Wettest Quarter (BIO8)');
+                addOption(variableSelect, 'bio9', 'Mean Temp of Driest Quarter (BIO9)');
+                addOption(variableSelect, 'bio10', 'Mean Temp of Warmest Quarter (BIO10)');
+                addOption(variableSelect, 'bio11', 'Mean Temp of Coldest Quarter (BIO11)');
+                addOption(variableSelect, 'bio12', 'Annual Precipitation (BIO12)');
+                addOption(variableSelect, 'bio13', 'Precipitation of Wettest Month (BIO13)');
+                addOption(variableSelect, 'bio14', 'Precipitation of Driest Month (BIO14)');
+                addOption(variableSelect, 'bio15', 'Precipitation Seasonality (BIO15)');
+                addOption(variableSelect, 'bio16', 'Precipitation of Wettest Quarter (BIO16)');
+                addOption(variableSelect, 'bio17', 'Precipitation of Driest Quarter (BIO17)');
+                addOption(variableSelect, 'bio18', 'Precipitation of Warmest Quarter (BIO18)');
+                addOption(variableSelect, 'bio19', 'Precipitation of Coldest Quarter (BIO19)');
+
+                // Hide date controls because Bioclim is static
+                dateControls.style.display = 'none';
+            }
+            else if(dataSource === 'koppen'){
+                addOption(variableSelect, 'af', 'Tropical Rainforest (Af)');
+                addOption(variableSelect, 'am', 'Tropical Monsoon (Am)');
+                addOption(variableSelect, 'aw', 'Tropical Savanna (Aw)');
+                addOption(variableSelect, 'bwh', 'Hot Desert (BWh)');
+                addOption(variableSelect, 'bwk', 'Cold Desert (BWk)');
+                addOption(variableSelect, 'bsh', 'Hot Steppe (BSh)');
+                addOption(variableSelect, 'bsk', 'Cold Steppe (BSk)');
+                addOption(variableSelect, 'csa', 'Dry - Hot Summer (Csa)');
+                addOption(variableSelect, 'csb', 'Dry - Warm Summer (Csb)');
+                addOption(variableSelect, 'csc', 'Dry - Cold Summer (Csc)');
+                addOption(variableSelect, 'cfa', 'Monsoonal - Hot Summer (Cfa)');
+                addOption(variableSelect, 'cfb', 'Monsoonal - Warm Summer (Cfb)');
+                addOption(variableSelect, 'cfc', 'Monsoonal - Cool Summer (Cfc)');
+                addOption(variableSelect, 'cwa', 'Dry Winter - Hot Summer (Cwa)');
+                addOption(variableSelect, 'cwb', 'Dry Winter - Warm Summer (Cwb)');
+                addOption(variableSelect, 'cwc', 'Dry Winter - Cool Summer (Cwc)');
+                addOption(variableSelect, 'dsa', 'Boreal - Dry Summer, Hot Summer (Dsa)');
+                addOption(variableSelect, 'dsb', 'Boreal - Dry Summer, Warm Summer (Dsb)');
+                addOption(variableSelect, 'dsc', 'Boreal - Dry Summer, Cool Summer  (Dsc)');
+                addOption(variableSelect, 'dfa', 'Boreal - No Dry Season, Hot Summer (Dfa)');
+                addOption(variableSelect, 'dfb', 'Boreal - No Dry Season, Warm Summer (Dfb)');
+                addOption(variableSelect, 'dfc', 'Boreal - No Dry Season, Cool Summer');
+                addOption(variableSelect, 'dfd', 'Boreal - No Dry Season, Very Cold Winter (Dfd)');
+                addOption(variableSelect, 'dwa', 'Boreal - Dry Winter, Hot Summer (Dwa)');
+                addOption(variableSelect, 'dwb', 'Boreal - Dry Winter, Warm Summer (Dwb)');
+                addOption(variableSelect, 'dwc', 'Boreal - Dry Winter, Cool Summer (Dwc)');
+                addOption(variableSelect, 'dwd', 'Boreal - Dry Winter, Very Cold Winter (Dwd)');
+                addOption(variableSelect, 'ef', 'Frost (EF)');
+                addOption(variableSelect, 'all', 'All Zones Combined (All)');
+                dateControls.style.display = 'none';
+            }
+
+            else if (dataSource === 'soil') {
                 addOption(variableSelect, 'bdod', 'Bulk Density');
                 addOption(variableSelect, 'cec', 'Cation Exchange Capacity');
                 addOption(variableSelect, 'cfvo', 'Coarse Fragments Volumetric');
@@ -421,46 +443,109 @@
                 addOption(variableSelect, 'ws', 'Wind Speed');
                 dateControls.style.display = 'block';
             } else if (dataSource === 'np') {
-                // NASA POWER variables (add more as needed)
+                  addOption(variableSelect, 'airmass', 'Air Mass');
+                addOption(variableSelect, 'allsky_kt', 'All-Sky Kt');
+                addOption(variableSelect, 'allsky_nkt', 'All-Sky NKt');
+                addOption(variableSelect, 'allsky_sfc_lw_dwn', 'All-Sky Surface LW Down');
+                addOption(variableSelect, 'allsky_sfc_lw_up', 'All-Sky Surface LW Up');
+                addOption(variableSelect, 'allsky_sfc_par_diff', 'All-Sky Surface PAR Diffuse');
+                addOption(variableSelect, 'allsky_sfc_par_dirh', 'All-Sky Surface PAR Direct Horizontal');
+                addOption(variableSelect, 'allsky_sfc_par_tot', 'All-Sky Surface PAR Total');
+                addOption(variableSelect, 'allsky_sfc_sw_diff', 'All-Sky Surface SW Diffuse');
+                addOption(variableSelect, 'allsky_sfc_sw_dirh', 'All-Sky Surface SW Direct Horizontal');
+                addOption(variableSelect, 'allsky_sfc_sw_dni', 'All-Sky Surface SW DNI');
                 addOption(variableSelect, 'allsky_sfc_sw_dwn', 'All-Sky Surface SW Down');
+                addOption(variableSelect, 'allsky_sfc_sw_up', 'All-Sky Surface SW Up');
+                addOption(variableSelect, 'allsky_sfc_uv_index', 'All-Sky Surface UV Index');
+                addOption(variableSelect, 'allsky_sfc_uva', 'All-Sky Surface UVA');
+                addOption(variableSelect, 'allsky_sfc_uvb', 'All-Sky Surface UVB');
+                addOption(variableSelect, 'allsky_srf_alb', 'All-Sky Surface Albedo');
+                addOption(variableSelect, 'aod_55', 'AOD 550nm');
+                addOption(variableSelect, 'aod_55_adj', 'AOD 550nm Adjusted');
+                addOption(variableSelect, 'aod_84', 'AOD 840nm');
+                addOption(variableSelect, 'cloud_amt', 'Cloud Amount');
+                addOption(variableSelect, 'cloud_amt_day', 'Cloud Amount Day');
+                addOption(variableSelect, 'cloud_amt_night', 'Cloud Amount Night');
+                addOption(variableSelect, 'cloud_od', 'Cloud Optical Depth');
+                addOption(variableSelect, 'clrsky_days', 'Clear Sky Days');
+                addOption(variableSelect, 'clrsky_kt', 'Clear Sky Kt');
+                addOption(variableSelect, 'clrsky_nkt', 'Clear Sky NKt');
+                addOption(variableSelect, 'clrsky_sfc_lw_dwn', 'Clear Sky Surface LW Down');
+                addOption(variableSelect, 'clrsky_sfc_lw_up', 'Clear Sky Surface LW Up');
+                addOption(variableSelect, 'clrsky_sfc_par_diff', 'Clear Sky Surface PAR Diffuse');
+                addOption(variableSelect, 'clrsky_sfc_par_dirh', 'Clear Sky Surface PAR Direct Horizontal');
+                addOption(variableSelect, 'clrsky_sfc_par_tot', 'Clear Sky Surface PAR Total');
+                addOption(variableSelect, 'clrsky_sfc_sw_diff', 'Clear Sky Surface SW Diffuse');
+                addOption(variableSelect, 'clrsky_sfc_sw_dirh', 'Clear Sky Surface SW Direct Horizontal');
+                addOption(variableSelect, 'clrsky_sfc_sw_dni', 'Clear Sky Surface SW DNI');
+                addOption(variableSelect, 'clrsky_sfc_sw_dwn', 'Clear Sky Surface SW Down');
+                addOption(variableSelect, 'clrsky_sfc_sw_up', 'Clear Sky Surface SW Up');
+                addOption(variableSelect, 'clrsky_srf_alb', 'Clear Sky Surface Albedo');
+                addOption(variableSelect, 'midday_insol', 'Midday Insolation');
+                addOption(variableSelect, 'original_allsky_sfc_sw_diff', 'Original All-Sky Surface SW Diffuse');
+                addOption(variableSelect, 'original_allsky_sfc_sw_dirh', 'Original All-Sky Surface SW Direct Horizontal');
+                addOption(variableSelect, 'psh', 'Peak Sun Hours');
+                addOption(variableSelect, 'pw', 'Precipitable Water');
+                addOption(variableSelect, 'srf_alb_adj', 'Surface Albedo Adjusted');
+                addOption(variableSelect, 'toa_sw_dni', 'TOA SW DNI');
+                addOption(variableSelect, 'toa_sw_dwn', 'TOA SW Down');
+                addOption(variableSelect, 'ts_adj', 'Temperature Adjusted');
+                dateControls.style.display = 'block';
+            } else if (dataSource === 'era5') {
+                addOption(variableSelect, 'evaptrans', 'Evapotranspiration');
+                addOption(variableSelect, 'latheat', 'Latent Heat');
+                addOption(variableSelect, 'netsolrad', 'Net Solar Radiation');
+                addOption(variableSelect, 'press', 'Pressure');
+                addOption(variableSelect, 'sktemp', 'Skin Temperature');
+                addOption(variableSelect, 'sotemp1', 'Soil Temp Layer 1');
+                addOption(variableSelect, 'sotemp2', 'Soil Temp Layer 2');
+                addOption(variableSelect, 'sotemp3', 'Soil Temp Layer 3');
+                addOption(variableSelect, 'temp', 'Temperature');
+                addOption(variableSelect, 'totprec', 'Total Precipitation');
+                addOption(variableSelect, 'uwind', 'U-Wind');
+                addOption(variableSelect, 'vwind', 'V-Wind');
+                addOption(variableSelect, 'volsowat1', 'Soil Water Vol Layer 1');
+                addOption(variableSelect, 'volsowat12', 'Soil Water Vol Layer 2');
+                addOption(variableSelect, 'volsowat13', 'Soil Water Vol Layer 3');
+                dateControls.style.display = 'block';
+            } else if (dataSource === 'brazil') {
+                addOption(variableSelect, 'eto', 'Evapotranspiration');
+                addOption(variableSelect, 'u2', 'Wind Speed at 2 metres');
+                addOption(variableSelect, 'rh', 'Relative Humidity');
+                addOption(variableSelect, 'rs', 'Solar Radiation');
+                addOption(variableSelect, 'tmax', 'Maximum Temperature');
+                addOption(variableSelect, 'tmin', 'Minimum Temperature');
+                addOption(variableSelect, 'pr', 'Precipitation');
                 dateControls.style.display = 'block';
             }
         }
-
         // Handle map click event for point selection
         map.on('click', function (e) {
             // Only handle clicks in point mode
             if (!document.getElementById('content-point').classList.contains('active')) {
                 return;
             }
-
             const lat = e.latlng.lat.toFixed(6);
             const lon = e.latlng.lng.toFixed(6);
-
             // Update selected point
             selectedPoint = { lat, lon };
-
             // Update UI
             document.getElementById('selected-point').innerHTML = `
                 <strong>Selected Point:</strong><br>
                 Latitude: ${lat}<br>
                 Longitude: ${lon}
             `;
-
             // Remove previous marker if exists
             if (selectedMarker) {
                 map.removeLayer(selectedMarker);
             }
-
             // Add new marker
             selectedMarker = L.marker([lat, lon]).addTo(map);
         });
-
         // Handle drawn items event for bounding box
         map.on('draw:created', function (e) {
             const type = e.layerType;
             const layer = e.layer;
-
             if (type === 'rectangle') {
                 // Clear previous bounding box
                 drawnItems.eachLayer(function (layer) {
@@ -468,11 +553,9 @@
                         drawnItems.removeLayer(layer);
                     }
                 });
-
                 // Add the new bounding box
                 drawnItems.addLayer(layer);
                 bboxRectangle = layer;
-
                 // Get coordinates
                 const bounds = layer.getBounds();
                 bboxCoordinates = {
@@ -481,7 +564,6 @@
                     max_lat: bounds.getNorth().toFixed(6),
                     max_lon: bounds.getEast().toFixed(6)
                 };
-
                 // Update UI
                 document.getElementById('selected-bbox').innerHTML = `
                     <strong>Selected Bounding Box:</strong><br>
@@ -497,19 +579,15 @@
                     if (selectedMarker) {
                         map.removeLayer(selectedMarker);
                     }
-
                     // Add the new marker
                     drawnItems.addLayer(layer);
                     selectedMarker = layer;
-
                     // Get coordinates
                     const latlng = layer.getLatLng();
                     const lat = latlng.lat.toFixed(6);
                     const lon = latlng.lng.toFixed(6);
-
                     // Update selected point
                     selectedPoint = { lat, lon };
-
                     // Update UI
                     document.getElementById('selected-point').innerHTML = `
                         <strong>Selected Point:</strong><br>
@@ -519,7 +597,6 @@
                 }
             }
         });
-
         // Fetch point data button click handler
         document.getElementById('fetch-point-data').addEventListener('click', async function () {
             // Check if a point is selected
@@ -527,49 +604,41 @@
                 showError('Please select a point on the map first.');
                 return;
             }
-
             // Get form values
             const dataSource = document.getElementById('data-source-point').value;
             const variable = document.getElementById('variable-point').value;
-
             // Build API URL base
             let apiUrl = '';
-
-            if (dataSource === 'elev' || dataSource === 'sg') {
+            if (dataSource === 'elev' || dataSource === 'soil' || dataSource === 'bio') {
                 // For static data sources
                 apiUrl = `/climate-data-timeseries/?lat=${selectedPoint.lat}&lon=${selectedPoint.lon}&data_source=${dataSource}&variable=${variable}`;
             } else {
                 // For time series data
                 const startDate = document.getElementById('start-date').value;
                 const endDate = document.getElementById('end-date').value;
-
                 // Validate dates
                 if (!startDate || !endDate) {
                     showError('Please select start and end dates.');
                     return;
                 }
-
                 apiUrl = `/climate-data-timeseries/?lat=${selectedPoint.lat}&lon=${selectedPoint.lon}&start_date=${startDate}&end_date=${endDate}&data_source=${dataSource}&variable=${variable}`;
-            }
 
+            }
             // Show loading
             document.getElementById('loading').style.display = 'block';
             document.getElementById('error').textContent = '';
-
             try {
                 // Fetch data
                 const response = await fetch(apiUrl);
-
                 if (!response.ok) {
                     const errorData = await response.json();
                     throw new Error(errorData.detail || 'Failed to fetch data');
                 }
-
                 const data = await response.json();
-
+                console.log(data); // Log the data for debugging
                 // Process and display the data
-                if (dataSource === 'elev' || dataSource === 'sg') {
-                    displayStaticData(data, dataSource, variable);
+                if (dataSource === 'elev' || dataSource === 'soil' || dataSource === 'bio') {
+                    displayStaticData(data, dataSource);
                 } else {
                     displayTimeSeriesData(data);
                 }
@@ -580,173 +649,143 @@
                 document.getElementById('loading').style.display = 'none';
             }
         });
-        // Modify the fetch bounding box data button click handler
-            document.getElementById('fetch-bbox-data').addEventListener('click', async function () {
-                // Check if a bounding box is selected
-                if (!bboxCoordinates) {
-                    showError('Please draw a bounding box on the map first.');
+
+
+        let isFetching = false;
+
+        document.getElementById('fetch-bbox-data').addEventListener('click', async function () {
+            if (isFetching) return;
+            isFetching = true;
+
+            if (!bboxCoordinates) {
+                showError('Please draw a bounding box on the map first.');
+                isFetching = false;
+                return;
+            }
+
+            const dataSource = document.getElementById('data-source-bbox').value;
+            const variable = document.getElementById('variable-bbox').value;
+
+            let apiUrl = '';
+            const isTimeSeries = !(dataSource === 'elev' || dataSource === 'soil' || dataSource === 'bio');
+
+            if (isTimeSeries) {
+                const startDate = document.getElementById('bbox-start-date').value;
+                const endDate = document.getElementById('bbox-end-date').value;
+
+                if (!startDate || !endDate) {
+                    showError('Please select start and end dates.');
+                    isFetching = false;
                     return;
                 }
 
-                // Get form values
-                const dataSource = document.getElementById('data-source-bbox').value;
-                const variable = document.getElementById('variable-bbox').value;
-                const isTimeSeries = document.getElementById('bbox-time-series-toggle').checked;
+                apiUrl = `/climate-data-timeseries-bbox-sampled/?min_lat=${bboxCoordinates.min_lat}&min_lon=${bboxCoordinates.min_lon}&max_lat=${bboxCoordinates.max_lat}&max_lon=${bboxCoordinates.max_lon}&start_date=${startDate}&end_date=${endDate}&data_source=${dataSource}&variable=${variable}`;
+            } else {
+                apiUrl = `/climate-data-timeseries-bbox-sampled/?min_lat=${bboxCoordinates.min_lat}&min_lon=${bboxCoordinates.min_lon}&max_lat=${bboxCoordinates.max_lat}&max_lon=${bboxCoordinates.max_lon}&data_source=${dataSource}&variable=${variable}`;
+            }
 
-                // Build API URL
-                let apiUrl = '';
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error').textContent = '';
 
-                // For static data sources
-                if (dataSource === 'elev' || dataSource === 'sg') {
-                    if (isTimeSeries) {
-                        showError('Time series is not available for static data sources.');
-                        return;
-                    }
-
-                    const dummyDate = '2023-01-01'; // Use a dummy date
-                    apiUrl = `/climate-data-bbox/?min_lat=${bboxCoordinates.min_lat}&min_lon=${bboxCoordinates.min_lon}&max_lat=${bboxCoordinates.max_lat}&max_lon=${bboxCoordinates.max_lon}&date=${dummyDate}&data_source=${dataSource}&variable=${variable}`;
-                } else {
-                    // For time series data sources
-                    if (isTimeSeries) {
-                        // Time series mode
-                        const startDate = document.getElementById('bbox-start-date').value;
-                        const endDate = document.getElementById('bbox-end-date').value;
-
-                        // Validate dates
-                        if (!startDate || !endDate) {
-                            showError('Please select start and end dates.');
-                            return;
-                        }
-
-                        apiUrl = `/climate-data-bbox-timeseries/?min_lat=${bboxCoordinates.min_lat}&min_lon=${bboxCoordinates.min_lon}&max_lat=${bboxCoordinates.max_lat}&max_lon=${bboxCoordinates.max_lon}&start_date=${startDate}&end_date=${endDate}&data_source=${dataSource}&variable=${variable}`;
-                    } else {
-                        // Single date mode
-                        const date = document.getElementById('bbox-date').value;
-
-                        // Validate date
-                        if (!date) {
-                            showError('Please select a date.');
-                            return;
-                        }
-
-                        apiUrl = `/climate-data-bbox/?min_lat=${bboxCoordinates.min_lat}&min_lon=${bboxCoordinates.min_lon}&max_lat=${bboxCoordinates.max_lat}&max_lon=${bboxCoordinates.max_lon}&date=${date}&data_source=${dataSource}&variable=${variable}`;
-                    }
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Failed to fetch data');
                 }
 
-                // Show loading
-                document.getElementById('loading').style.display = 'block';
-                document.getElementById('error').textContent = '';
+                const data = await response.json();
 
-                try {
-                    // Fetch data
-                    const response = await fetch(apiUrl);
-
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.detail || 'Failed to fetch data');
+                drawnItems.eachLayer(function (layer) {
+                    if (layer instanceof L.CircleMarker) {
+                        drawnItems.removeLayer(layer);
                     }
+                });
 
-                    const data = await response.json();
+                if (data.message && data.points?.length === 0) {
+                    showError(data.message);
+                } else if (isTimeSeries) {
+                    displayBoundingBoxTimeSeries(data);
+                } else {
+                    // Handle static data (soil, elev)
+                    const variable = document.getElementById('variable-bbox').value;
 
-                    // Clear any existing point markers
-                    drawnItems.eachLayer(function (layer) {
-                        if (layer instanceof L.CircleMarker) {
-                            drawnItems.removeLayer(layer);
-                        }
+                    data.points.forEach((point, index) => {
+                        const lat = point.lat;
+                        const lon = point.lon;
+                        const values = point.values;
+
+                        // Draw marker for the static point
+                        const value = values[variable] ?? 0;
+
+                        const marker = L.circleMarker([lat, lon], {
+                            radius: 5,
+                            fillColor: getColorForValue(value),
+                            color: '#000',
+                            weight: 1,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        }).addTo(drawnItems);
+
+                        marker.bindPopup(`
+                            <strong>Point ${index + 1}</strong><br>
+                            <strong>Position:</strong> ${lat.toFixed(6)}, ${lon.toFixed(6)}<br>
+                            <strong>${getVariableLabel(variable, dataSource)}:</strong> ${value.toFixed(2)} ${getUnitLabel(variable, dataSource)}
+                        `);
+
+                        // On click, show the bar chart using displayStaticData
+                        marker.on('click', function () {
+                            const chartPayload = {
+                                location: { lat, lon },
+                                data: Object.keys(values).map(v => ({
+                                    variable: v,
+                                    value: values[v]
+                                }))
+                            };
+                            displayStaticData(chartPayload, dataSource);
+                        });
                     });
 
-                    // Display data based on mode
-                    if (isTimeSeries) {
-                        displayBoundingBoxTimeSeries(data);
-                    } else {
-                        displayBoundingBoxData(data);
+                    // Show the first point’s chart by default
+                    if (data.points.length > 0) {
+                        const firstPoint = data.points[0];
+                        const chartPayload = {
+                            location: { lat: firstPoint.lat, lon: firstPoint.lon },
+                            data: Object.keys(firstPoint.values).map(v => ({
+                                variable: v,
+                                value: firstPoint.values[v]
+                            }))
+                        };
+                        displayStaticData(chartPayload, dataSource);
                     }
-                } catch (error) {
-                    showError(error.message);
-                } finally {
-                    // Hide loading
-                    document.getElementById('loading').style.display = 'none';
+
+                    // Show a static summary
+                    document.getElementById('points-summary').innerHTML = `
+                        <p><strong>Sample points:</strong> ${data.points.length} of 5 samples</p>
+                        <p><strong>Click a point to view its static data chart.</strong></p>
+                    `;
+                    document.getElementById('points-info').style.display = 'block';
                 }
-            });
 
-        // // Fetch bounding box data button click handler
-        // document.getElementById('fetch-bbox-data').addEventListener('click', async function () {
-        //     // Check if a bounding box is selected
-        //     if (!bboxCoordinates) {
-        //         showError('Please draw a bounding box on the map first.');
-        //         return;
-        //     }
-
-        //     // Get form values
-        //     const dataSource = document.getElementById('data-source-bbox').value;
-        //     const variable = document.getElementById('variable-bbox').value;
-
-        //     // Build API URL
-        //     let apiUrl = '';
-
-        //     // For static data sources
-        //     if (dataSource === 'elev' || dataSource === 'sg') {
-        //         const dummyDate = '2023-01-01'; // Use a dummy date
-        //         apiUrl = `/climate-data-bbox/?min_lat=${bboxCoordinates.min_lat}&min_lon=${bboxCoordinates.min_lon}&max_lat=${bboxCoordinates.max_lat}&max_lon=${bboxCoordinates.max_lon}&date=${dummyDate}&data_source=${dataSource}&variable=${variable}`;
-        //     } else {
-        //         // For time series data sources
-        //         const date = document.getElementById('bbox-date').value;
-
-        //         // Validate date
-        //         if (!date) {
-        //             showError('Please select a date.');
-        //             return;
-        //         }
-
-        //         apiUrl = `/climate-data-bbox/?min_lat=${bboxCoordinates.min_lat}&min_lon=${bboxCoordinates.min_lon}&max_lat=${bboxCoordinates.max_lat}&max_lon=${bboxCoordinates.max_lon}&date=${date}&data_source=${dataSource}&variable=${variable}`;
-        //     }
-
-        //     // Show loading
-        //     document.getElementById('loading').style.display = 'block';
-        //     document.getElementById('error').textContent = '';
-
-        //     try {
-        //         // Fetch data
-        //         const response = await fetch(apiUrl);
-
-        //         if (!response.ok) {
-        //             const errorData = await response.json();
-        //             throw new Error(errorData.detail || 'Failed to fetch data');
-        //         }
-
-        //         const data = await response.json();
-
-        //         // Clear any existing point markers
-        //         drawnItems.eachLayer(function (layer) {
-        //             if (layer instanceof L.CircleMarker) {
-        //                 drawnItems.removeLayer(layer);
-        //             }
-        //         });
-
-        //         // Display bounding box data
-        //         displayBoundingBoxData(data);
-        //     } catch (error) {
-        //         showError(error.message);
-        //     } finally {
-        //         // Hide loading
-        //         document.getElementById('loading').style.display = 'none';
-        //     }
-        // });
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                isFetching = false;
+            }
+        });
 
         // Clear point selection button click handler
         document.getElementById('clear-point-selection').addEventListener('click', function () {
             // Clear selected point
             selectedPoint = null;
-
             // Remove marker if exists
             if (selectedMarker) {
                 map.removeLayer(selectedMarker);
                 selectedMarker = null;
             }
-
             // Reset UI
             document.getElementById('selected-point').innerHTML = '<p>Click on the map to select a point.</p>';
-
             // Clear chart
             // Clear chart
             if (timeSeriesChart) {
@@ -754,213 +793,69 @@
                 timeSeriesChart = null;
             }
         });
-
         // Clear bbox selection button click handler
         document.getElementById('clear-bbox-selection').addEventListener('click', function () {
             // Clear bounding box selection
             bboxCoordinates = null;
-
             // Remove all drawn items
             drawnItems.clearLayers();
-
             // Reset UI
             document.getElementById('selected-bbox').innerHTML = '<p>Use the rectangle tool to draw a bounding box on the map.</p>';
             document.getElementById('points-info').style.display = 'none';
-
             // Clear chart
             if (timeSeriesChart) {
                 timeSeriesChart.destroy();
                 timeSeriesChart = null;
             }
         });
-
-        // Add a new function to display time series data for multiple points
-            function displayBoundingBoxTimeSeries(data) {
-                // Store the data
-                pointsData = data;
-                const points = data.points;
-
-                if (!points || points.length === 0) {
-                    showError('No data points found within the bounding box.');
-                    return;
-                }
-
-                // Add markers for each point on the map
-                points.forEach((point, index) => {
-                    // Calculate average value for each point
-                    const values = point.values.map(v => v.value);
-                    const avgValue = values.reduce((a, b) => a + b, 0) / values.length;
-
-                    const marker = L.circleMarker([point.lat, point.lon], {
-                        radius: 5,
-                        fillColor: getColorForValue(avgValue),
-                        color: '#000',
-                        weight: 1,
-                        opacity: 1,
-                        fillOpacity: 0.8
-                    }).addTo(drawnItems);
-
-                    marker.bindPopup(`
-            <strong>Position:</strong> ${point.lat}, ${point.lon}<br>
-            <strong>Average value:</strong> ${avgValue.toFixed(2)} ${getUnitLabel(data.variable, data.data_source)}<br>
-            <strong>Number of time steps:</strong> ${point.values.length}
-        `);
-
-                    // Add click event to show this point's time series
-                    marker.on('click', function () {
-                        showTimeSeriesForPoint(data, index);
-                    });
-                });
-
-                // Calculate overall statistics across all points and time steps
-                let allValues = [];
-                points.forEach(point => {
-                    point.values.forEach(v => {
-                        allValues.push(v.value);
-                    });
-                });
-
-                const min = Math.min(...allValues);
-                const max = Math.max(...allValues);
-                const avg = allValues.reduce((a, b) => a + b, 0) / allValues.length;
-
-                // Update points info
-                document.getElementById('points-summary').innerHTML = `
-        <p><strong>Total sample points:</strong> ${points.length}</p>
-        <p><strong>Time period:</strong> ${data.start_date} to ${data.end_date}</p>
-        <p><strong>Min value across all data:</strong> ${min.toFixed(2)} ${getUnitLabel(data.variable, data.data_source)}</p>
-        <p><strong>Max value across all data:</strong> ${max.toFixed(2)} ${getUnitLabel(data.variable, data.data_source)}</p>
-        <p><strong>Average value across all data:</strong> ${avg.toFixed(2)} ${getUnitLabel(data.variable, data.data_source)}</p>
-        <p><em>Click on a point marker to see its time series.</em></p>
-    `;
-                document.getElementById('points-info').style.display = 'block';
-
-                // Show the first point's time series by default
-                if (points.length > 0) {
-                    showTimeSeriesForPoint(data, 0);
-                }
+        // Function to display time series data for a specific point
+        function showTimeSeriesForPoint(data, pointIndex) {
+            const point = data.points[pointIndex];
+            const variable = document.getElementById('variable-bbox').value;
+            // Check if we have valid time series data
+            if (!point || !point.values || (Array.isArray(point.values) && point.values.length === 0)) {
+                showError('No time series data available for this point.');
+                return;
             }
-        // Function to show time series for a specific point
-            function showTimeSeriesForPoint(data, pointIndex) {
-                const point = data.points[pointIndex];
-
-                // Create a context for the chart
-                const ctx = document.getElementById('timeSeriesChart').getContext('2d');
-
-                // Destroy previous chart if exists
-                if (timeSeriesChart) {
-                    timeSeriesChart.destroy();
-                }
-
-                // Prepare chart data
-                const chartLabels = [];
-                const chartData = [];
-
-                // Sort values by date
-                const sortedValues = [...point.values].sort((a, b) => {
-                    if (a.date < b.date) return -1;
-                    if (a.date > b.date) return 1;
-                    return 0;
-                });
-
-                // Process values
-                sortedValues.forEach(entry => {
-                    chartLabels.push(entry.date);
-                    chartData.push(entry.value);
-                });
-
-                // Create new chart
-                timeSeriesChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: chartLabels,
-                        datasets: [{
-                            label: getVariableLabel(data.variable, data.data_source),
-                            data: chartData,
-                            borderColor: getChartColor(data.variable),
-                            backgroundColor: getChartColor(data.variable, 0.1),
-                            tension: 0.1,
-                            pointRadius: 3,
-                            pointHoverRadius: 5
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            y: {
-                                beginAtZero: false,
-                                title: {
-                                    display: true,
-                                    text: getUnitLabel(data.variable, data.data_source)
-                                }
-                            },
-                            x: {
-                                title: {
-                                    display: true,
-                                    text: getCadenceLabel(data.cadence)
-                                }
-                            }
-                        },
-                        plugins: {
-                            title: {
-                                display: true,
-                                text: `${getVariableLabel(data.variable, data.data_source)} at Lat: ${point.lat}, Lon: ${point.lon}`
-                            },
-                            legend: {
-                                display: true
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function (context) {
-                                        return `${context.dataset.label}: ${context.raw} ${getUnitLabel(data.variable, data.data_source)}`;
-                                    }
-                                }
-                            }
+            // Prepare data for chart
+            let chartLabels = [];
+            let chartData = [];
+            if (Array.isArray(point.values)) {
+                // Data is in time series format
+                point.values.forEach(timeValue => {
+                    if (timeValue.values[variable] !== undefined) {
+                        // Format the label based on whether we have day information
+                        let dateLabel;
+                        if (timeValue.day) {
+                            dateLabel = `${timeValue.year}-${timeValue.month.toString().padStart(2, '0')}-${timeValue.day.toString().padStart(2, '0')}`;
+                        } else {
+                            dateLabel = `${timeValue.year}-${timeValue.month.toString().padStart(2, '0')}`;
                         }
+                        chartLabels.push(dateLabel);
+                        chartData.push(timeValue.values[variable]);
                     }
                 });
+            } else {
+                // Single value data
+                chartLabels.push('Value');
+                chartData.push(point.values[variable]);
             }
-        // Function to display time series data for a single point
-        function displayTimeSeriesData(data) {
-            // Prepare chart data
-            const chartLabels = [];
-            const chartData = [];
-
-            // Process values based on cadence
-            data.values.forEach(entry => {
-                if (entry.value !== null) {
-                    // Format date label based on cadence
-                    let dateLabel;
-                    if (data.cadence === 'monthly') {
-                        dateLabel = `${entry.year}-${entry.month.toString().padStart(2, '0')}`;
-                    } else {
-                        dateLabel = entry.date;
-                    }
-
-                    chartLabels.push(dateLabel);
-                    chartData.push(entry.value);
-                }
-            });
-
             // Create chart
             const ctx = document.getElementById('timeSeriesChart').getContext('2d');
-
             // Destroy previous chart if exists
             if (timeSeriesChart) {
                 timeSeriesChart.destroy();
             }
-
             // Create new chart
             timeSeriesChart = new Chart(ctx, {
-                type: 'line',
+                type: Array.isArray(point.values) && point.values.length > 1 ? 'line' : 'bar',
                 data: {
                     labels: chartLabels,
                     datasets: [{
-                        label: getVariableLabel(data.variable, data.data_source),
+                        label: getVariableLabel(variable, data.data_source),
                         data: chartData,
-                        borderColor: getChartColor(data.variable),
-                        backgroundColor: getChartColor(data.variable, 0.1),
+                        borderColor: getChartColor(variable),
+                        backgroundColor: getChartColor(variable, 0.1),
                         tension: 0.1,
                         pointRadius: 3,
                         pointHoverRadius: 5
@@ -974,7 +869,168 @@
                             beginAtZero: false,
                             title: {
                                 display: true,
-                                text: getUnitLabel(data.variable, data.data_source)
+                                text: getUnitLabel(variable, data.data_source)
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: Array.isArray(point.values) && point.values.length > 1 ? getCadenceLabel(data.cadence) : 'Value'
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${getVariableLabel(variable, data.data_source)} at Lat: ${point.lat.toFixed(6)}, Lon: ${point.lon.toFixed(6)}`
+                        },
+                        legend: {
+                            display: true
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    return `${context.dataset.label}: ${context.raw} ${getUnitLabel(variable, data.data_source)}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        // Function to display time series data for multiple points
+        function displayBoundingBoxTimeSeries(data) {
+            // Store the data
+            pointsData = data;
+            const points = data.points;
+            const variable = document.getElementById('variable-bbox').value;
+            if (!points || points.length === 0) {
+                showError('No data points found within the bounding box.');
+                return;
+            }
+            // Add markers for each point on the map
+            points.forEach((point, index) => {
+                // Calculate average value for each point over time
+                let avgValue = 0;
+                let validValues = 0;
+                if (Array.isArray(point.values)) {
+                    // Time series data
+                    point.values.forEach(timeValue => {
+                        if (timeValue.values[variable] !== undefined) {
+                            avgValue += timeValue.values[variable];
+                            validValues++;
+                        }
+                    });
+                    if (validValues > 0) {
+                        avgValue /= validValues;
+                    }
+                } else {
+                    // Single value data
+                    avgValue = point.values[variable] || 0;
+                }
+                const marker = L.circleMarker([point.lat, point.lon], {
+                    radius: 5,
+                    fillColor: getColorForValue(avgValue),
+                    color: '#000',
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                }).addTo(drawnItems);
+                marker.bindPopup(`
+            <strong>Point ${index + 1}</strong><br>
+            <strong>Position:</strong> ${point.lat.toFixed(6)}, ${point.lon.toFixed(6)}<br>
+            <strong>Average value:</strong> ${avgValue.toFixed(2)} ${getUnitLabel(variable, data.data_source)}<br>
+            <strong>Time steps:</strong> ${Array.isArray(point.values) ? point.values.length : 1}
+        `);
+                // Add click event to show this point's time series
+                marker.on('click', function () {
+                    showTimeSeriesForPoint(data, index);
+                });
+            });
+            // Calculate overall statistics
+            let allValues = [];
+            points.forEach(point => {
+                if (Array.isArray(point.values)) {
+                    // Time series data
+                    point.values.forEach(timeValue => {
+                        if (timeValue.values[variable] !== undefined) {
+                            allValues.push(timeValue.values[variable]);
+                        }
+                    });
+                } else if (point.values[variable] !== undefined) {
+                    // Single value data
+                    allValues.push(point.values[variable]);
+                }
+            });
+            const min = allValues.length > 0 ? Math.min(...allValues) : 0;
+            const max = allValues.length > 0 ? Math.max(...allValues) : 0;
+            const avg = allValues.length > 0 ? allValues.reduce((a, b) => a + b, 0) / allValues.length : 0;
+            // Update points info
+            document.getElementById('points-summary').innerHTML = `
+        <p><strong>Sample points:</strong> ${points.length} of 5 samples</p>
+        <p><strong>Time period:</strong> ${data.start_date} to ${data.end_date}</p>
+        <p><strong>Min value:</strong> ${min.toFixed(2)} ${getUnitLabel(variable, data.data_source)}</p>
+        <p><strong>Max value:</strong> ${max.toFixed(2)} ${getUnitLabel(variable, data.data_source)}</p>
+        <p><strong>Average value:</strong> ${avg.toFixed(2)} ${getUnitLabel(variable, data.data_source)}</p>
+        <p><em>Click on a point marker to see its time series.</em></p>
+    `;
+            document.getElementById('points-info').style.display = 'block';
+            // Show the first point's time series by default if available
+            if (points.length > 0) {
+                showTimeSeriesForPoint(data, 0);
+            }
+        }
+        // Function to display time series data for a single point (updated for new response format)
+        function displayTimeSeriesData(data) {
+            // Get selected variable
+            const variable = document.getElementById('variable-point').value;
+            // Prepare chart data
+            const chartLabels = [];
+            const chartData = [];
+            // Process values based on the new data format
+            data.data.forEach(entry => {
+                if (entry.values[variable] !== undefined && entry.values[variable] !== null) {
+                    // Format date label based on cadence
+                    let dateLabel;
+                    if (data.cadence === 'monthly') {
+                        dateLabel = `${entry.year}-${entry.month.toString().padStart(2, '0')}`;
+                    } else {
+                        dateLabel = entry.date;
+                    }
+                    chartLabels.push(dateLabel);
+                    chartData.push(entry.values[variable]);
+                }
+            });
+            // Create chart
+            const ctx = document.getElementById('timeSeriesChart').getContext('2d');
+            // Destroy previous chart if exists
+            if (timeSeriesChart) {
+                timeSeriesChart.destroy();
+            }
+            // Create new chart
+            timeSeriesChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartLabels,
+                    datasets: [{
+                        label: getVariableLabel(variable, data.data_source),
+                        data: chartData,
+                        borderColor: getChartColor(variable),
+                        backgroundColor: getChartColor(variable, 0.1),
+                        tension: 0.1,
+                        pointRadius: 3,
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: getUnitLabel(variable, data.data_source)
                             }
                         },
                         x: {
@@ -987,7 +1043,7 @@
                     plugins: {
                         title: {
                             display: true,
-                            text: `${getVariableLabel(data.variable, data.data_source)} at Lat: ${data.lat}, Lon: ${data.lon}`
+                            text: `${getVariableLabel(variable, data.data_source)} at Lat: ${data.location.lat}, Lon: ${data.location.lon}`
                         },
                         legend: {
                             display: true
@@ -995,7 +1051,7 @@
                         tooltip: {
                             callbacks: {
                                 label: function (context) {
-                                    return `${context.dataset.label}: ${context.raw} ${getUnitLabel(data.variable, data.data_source)}`;
+                                    return `${context.dataset.label}: ${context.raw} ${getUnitLabel(variable, data.data_source)}`;
                                 }
                             }
                         }
@@ -1003,162 +1059,114 @@
                 }
             });
         }
-
-        // Function to display static data for a single point
-        function displayStaticData(data, dataSource, variable) {
-            // Create a context for the chart
+        // Function to display static data for a single point (modified to handle multiple soil properties)
+        function displayStaticData(data, dataSource) {
             const ctx = document.getElementById('timeSeriesChart').getContext('2d');
-
-            // Destroy previous chart if exists
             if (timeSeriesChart) {
                 timeSeriesChart.destroy();
             }
 
-            // For static data, create a bar chart showing the value
-            timeSeriesChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: [getVariableLabel(variable, dataSource)],
-                    datasets: [{
-                        label: getVariableLabel(variable, dataSource),
-                        data: [data.values[0].value],
-                        backgroundColor: getChartColor(variable, 0.6),
-                        borderColor: getChartColor(variable),
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: false,
+            const isMulti = Array.isArray(data.data) && data.data.length > 1;
+            const isSingle = Array.isArray(data.data) && data.data.length === 1;
+
+            if ((dataSource === 'soil' || dataSource === 'elev' || dataSource === 'bio') && isMulti) {
+                // Multiple variables returned (e.g., all of soilgrids or elevation derivatives)
+                const properties = data.data.map(d => d.variable);
+                const datasets = data.data.map(d => ({
+                    label: getVariableLabel(d.variable, dataSource),
+                    data: [d.value],
+                    backgroundColor: getChartColor(d.variable, 0.6),
+                    borderColor: getChartColor(d.variable),
+                    borderWidth: 1
+                }));
+
+                timeSeriesChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Static Variables'],
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                title: {
+                                    display: true,
+                                    text: 'Value'
+                                }
+                            }
+                        },
+                        plugins: {
                             title: {
                                 display: true,
-                                text: getUnitLabel(variable, dataSource)
-                            }
-                        }
-                    },
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: `${getVariableLabel(variable, dataSource)} at Lat: ${data.lat}, Lon: ${data.lon}`
-                        },
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function (context) {
-                                    return `${context.dataset.label}: ${context.raw} ${getUnitLabel(variable, dataSource)}`;
+                                text: `${dataSource === 'soil' ? 'Soil' : 'Elevation'} Variables at Lat: ${data.location.lat}, Lon: ${data.location.lon}`
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function (context) {
+                                        const variable = properties[context.datasetIndex];
+                                        return `${context.dataset.label}: ${context.raw} ${getUnitLabel(variable, dataSource)}`;
+                                    }
                                 }
                             }
                         }
                     }
-                }
-            });
-        }
+                });
+            } else if (isSingle) {
+                // Only one variable returned
+                const variable = data.data[0].variable;
+                const value = data.data[0].value;
 
-        // Function to display bounding box data (multiple points)
-        function displayBoundingBoxData(data) {
-            // Store the data
-            pointsData = data;
-            const points = data.points;
-
-            if (!points || points.length === 0) {
-                showError('No data points found within the bounding box.');
-                return;
-            }
-
-            // Add markers for each point on the map
-            points.forEach(point => {
-                const marker = L.circleMarker([point.lat, point.lon], {
-                    radius: 5,
-                    fillColor: getColorForValue(point.value),
-                    color: '#000',
-                    weight: 1,
-                    opacity: 1,
-                    fillOpacity: 0.8
-                }).addTo(drawnItems);
-
-                marker.bindPopup(`
-                    <strong>Position:</strong> ${point.lat}, ${point.lon}<br>
-                    <strong>Value:</strong> ${point.value.toFixed(2)} ${getUnitLabel(data.variable, data.data_source)}
-                `);
-            });
-
-            // Calculate statistics
-            const values = points.map(p => p.value);
-            const min = Math.min(...values);
-            const max = Math.max(...values);
-            const sum = values.reduce((a, b) => a + b, 0);
-            const avg = sum / values.length;
-
-            // Update points info
-            document.getElementById('points-summary').innerHTML = `
-                <p><strong>Total sample points:</strong> ${points.length}</p>
-                <p><strong>Min value:</strong> ${min.toFixed(2)} ${getUnitLabel(data.variable, data.data_source)}</p>
-                <p><strong>Max value:</strong> ${max.toFixed(2)} ${getUnitLabel(data.variable, data.data_source)}</p>
-                <p><strong>Average value:</strong> ${avg.toFixed(2)} ${getUnitLabel(data.variable, data.data_source)}</p>
-            `;
-            document.getElementById('points-info').style.display = 'block';
-
-            // Create a context for the chart
-            const ctx = document.getElementById('timeSeriesChart').getContext('2d');
-
-            // Destroy previous chart if exists
-            if (timeSeriesChart) {
-                timeSeriesChart.destroy();
-            }
-
-            // Create a bar chart showing all points
-            timeSeriesChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: points.map((_, i) => `Point ${i + 1}`),
-                    datasets: [{
-                        label: getVariableLabel(data.variable, data.data_source),
-                        data: points.map(p => p.value),
-                        backgroundColor: points.map(p => getColorForValue(p.value, 0.7)),
-                        borderColor: points.map(p => getColorForValue(p.value)),
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: false,
+                timeSeriesChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: [getVariableLabel(variable, dataSource)],
+                        datasets: [{
+                            label: getVariableLabel(variable, dataSource),
+                            data: [value],
+                            backgroundColor: getChartColor(variable, 0.6),
+                            borderColor: getChartColor(variable),
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                title: {
+                                    display: true,
+                                    text: getUnitLabel(variable, dataSource)
+                                }
+                            }
+                        },
+                        plugins: {
                             title: {
                                 display: true,
-                                text: getUnitLabel(data.variable, data.data_source)
-                            }
-                        }
-                    },
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: `${getVariableLabel(data.variable, data.data_source)} Values in Bounding Box`
-                        },
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function (context) {
-                                    const point = points[context.dataIndex];
-                                    return [
-                                        `Value: ${point.value.toFixed(2)} ${getUnitLabel(data.variable, data.data_source)}`,
-                                        `Lat: ${point.lat}, Lon: ${point.lon}`
-                                    ];
+                                text: `${getVariableLabel(variable, dataSource)} at Lat: ${data.location.lat}, Lon: ${data.location.lon}`
+                            },
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function (context) {
+                                        return `${context.dataset.label}: ${context.raw} ${getUnitLabel(variable, dataSource)}`;
+                                    }
                                 }
                             }
                         }
                     }
-                }
-            });
+                });
+            } else {
+                console.error("Unexpected or missing data format:", data);
+                alert("No valid static data available for this location.");
+            }
         }
+
 
         // Helper function to get color based on value
         function getColorForValue(value, alpha = 1) {
@@ -1168,7 +1176,6 @@
             const hue = (1 - Math.min(Math.max(normalizedValue, 0), 1)) * 240; // 0 = red (hot), 240 = blue (cold)
             return `hsla(${hue}, 100%, 50%, ${alpha})`;
         }
-
         // Helper functions
         function addOption(select, value, text) {
             const option = document.createElement('option');
@@ -1176,12 +1183,10 @@
             option.textContent = text;
             select.appendChild(option);
         }
-
         function showError(message) {
             document.getElementById('error').textContent = message;
             document.getElementById('loading').style.display = 'none';
         }
-
         function getChartColor(variable, alpha = 1) {
             const colors = {
                 'prec': `rgba(0, 119, 190, ${alpha})`,
@@ -1191,6 +1196,14 @@
                 'spei': `rgba(50, 205, 50, ${alpha})`,
                 'et': `rgba(128, 0, 128, ${alpha})`,
                 'elev': `rgba(139, 69, 19, ${alpha})`,
+                'slope': `rgba(205, 92, 92, ${alpha})`,
+                'hand': `rgba(255, 215, 0, ${alpha})`,
+                'aspect': `rgba(218, 165, 32, ${alpha})`,
+                'tpi': `rgba(154, 205, 50, ${alpha})`,
+                'tri': `rgba(106, 90, 205, ${alpha})`,
+                'roughness': `rgba(72, 61, 139, ${alpha})`,
+                'flowdir': `rgba(0, 139, 139, ${alpha})`,
+                'hillshade': `rgba(119, 136, 153, ${alpha})`,
                 'bdod': `rgba(165, 42, 42, ${alpha})`,
                 'cec': `rgba(255, 140, 0, ${alpha})`,
                 'cfvo': `rgba(128, 128, 0, ${alpha})`,
@@ -1209,7 +1222,6 @@
 
             return colors[variable] || `rgba(100, 100, 100, ${alpha})`;
         }
-
         function getVariableLabel(variable, dataSource) {
             const labels = {
                 'prec': 'Precipitation',
@@ -1219,6 +1231,14 @@
                 'spei': 'SPEI',
                 'et': 'Evapotranspiration',
                 'elev': 'Elevation',
+                'slope': 'Slope',
+                'hand': 'Height Above Nearest Drainage',
+                'aspect': 'Aspect',
+                'tpi': 'Topographic Position Index',
+                'tri': 'Terrain Ruggedness Index',
+                'roughness': 'Surface Roughness',
+                'flowdir': 'Flow Direction',
+                'hillshade': 'Hillshade',
                 'bdod': 'Bulk Density',
                 'cec': 'Cation Exchange Capacity',
                 'cfvo': 'Coarse Fragments Volumetric',
@@ -1232,36 +1252,35 @@
                 'soc': 'Soil Organic Carbon',
                 'wv0010': 'Water Vapor Content at 10cm',
                 'wv0030': 'Water Vapor Content at 30cm',
-                'wv1500': 'Water Vapor Content at 1500cm',
-                // TerraClim variables
-                'aet': 'Actual Evapotranspiration',
-                'def': 'Water Deficit',
-                'pdsi': 'Palmer Drought Severity Index',
-                'pet': 'Potential Evapotranspiration',
-                'ppt': 'Precipitation',
-                'q': 'Runoff',
-                'soil': 'Soil Moisture',
-                'srad': 'Solar Radiation',
-                'vap': 'Vapor Pressure',
-                'vpd': 'Vapor Pressure Deficit',
-                'ws': 'Wind Speed',
-                // NASA POWER variables
-                'allsky_sfc_sw_dwn': 'All-Sky Surface SW Down'
-                // Add more as needed
+                'wv1500': 'Water Vapor Content at 1500cm'
             };
-
             return labels[variable] || variable;
         }
-
         function getUnitLabel(variable, dataSource) {
-            if (variable === 'prec' || variable === 'chirps' || variable === 'et' || variable === 'ppt' || variable === 'aet' || variable === 'pet' || variable === 'q') {
+            if (variable === 'prec' || variable === 'chirps' || variable === 'et' || variable === 'ppt' || variable === 'aet' || variable === 'pet' || variable === 'q' || variable === 'totprec') {
                 return 'mm';
-            } else if (variable === 'tmax' || variable === 'tmin') {
+            } else if (variable === 'tmax' || variable === 'tmin' || variable === 'temp' || variable === 'sktemp' || variable === 'sotemp1' || variable === 'sotemp2' || variable === 'sotemp3') {
                 return '°C';
             } else if (variable === 'spei' || variable === 'pdsi') {
                 return 'index';
             } else if (variable === 'elev') {
                 return 'm';
+            } else if (variable === 'slope') {
+                return 'degrees';
+            } else if (variable === 'hand') {
+                return 'm';
+            } else if (variable === 'aspect') {
+                return 'degrees';
+            } else if (variable === 'tpi') {
+                return 'm';
+            } else if (variable === 'tri') {
+                return '';
+            } else if (variable === 'roughness') {
+                return 'm';
+            } else if (variable === 'flowdir') {
+                return 'direction';
+            } else if (variable === 'hillshade') {
+                return '';
             } else if (variable === 'bdod') {
                 return 'kg/dm³';
             } else if (variable === 'cec') {
@@ -1282,6 +1301,16 @@
                 return 'kPa';
             } else if (variable === 'ws') {
                 return 'm/s';
+            } else if (variable === 'latheat') {
+                return 'J/m²';
+            } else if (variable === 'netsolrad') {
+                return 'W/m²';
+            } else if (variable === 'press') {
+                return 'Pa';
+            } else if (variable === 'uwind' || variable === 'vwind') {
+                return 'm/s';
+            } else if (variable === 'volsowat1' || variable === 'volsowat12' || variable === 'volsowat13') {
+                return 'm³/m³';
             } else if (variable.includes('allsky') || variable.includes('clrsky') || variable.includes('toa')) {
                 return 'W/m²';
             }
@@ -1297,34 +1326,40 @@
                 'aggregated': 'Data Point',
                 'static': 'Data Point'
             };
-
             return labels[cadence] || 'Date';
         }
-
-            // Update the setDefaultDates function to include bounding box time series dates
-            function setDefaultDates() {
-                const today = new Date();
-                const sixMonthsAgo = new Date();
-                sixMonthsAgo.setMonth(today.getMonth() - 6);
-
-                document.getElementById('end-date').value = formatDate(today);
-                document.getElementById('start-date').value = formatDate(sixMonthsAgo);
-                document.getElementById('bbox-date').value = formatDate(today);
-                document.getElementById('bbox-end-date').value = formatDate(today);
-                document.getElementById('bbox-start-date').value = formatDate(sixMonthsAgo);
-            }
-
+        // Update the setDefaultDates function to include bounding box time series dates
+        function setDefaultDates() {
+            const today = new Date();
+            const sixMonthsAgo = new Date();
+            sixMonthsAgo.setMonth(today.getMonth() - 6);
+            document.getElementById('end-date').value = formatDate(today);
+            document.getElementById('start-date').value = formatDate(sixMonthsAgo);
+            document.getElementById('bbox-date').value = formatDate(today);
+            document.getElementById('bbox-end-date').value = formatDate(today);
+            document.getElementById('bbox-start-date').value = formatDate(sixMonthsAgo);
+        }
         function formatDate(date) {
             const year = date.getFullYear();
             const month = String(date.getMonth() + 1).padStart(2, '0');
             const day = String(date.getDate()).padStart(2, '0');
-
             return `${year}-${month}-${day}`;
         }
 
+        function createBioVariableMap(dataArray) {
+                const map = {};
+                if (Array.isArray(dataArray)) {
+                    dataArray.forEach(item => {
+                        if (item.variable && item.value !== undefined) {
+                            map[item.variable] = item.value;
+                        }
+                    });
+                }
+                return map;
+            }
+
         // Initialize
         setDefaultDates();
-
         // Draw the initial bounding box on the map
         const initialBboxRectangle = L.rectangle(initialBbox, {
             color: "#ff7800",
@@ -1335,3 +1370,4 @@
 </body>
 
 </html>
+

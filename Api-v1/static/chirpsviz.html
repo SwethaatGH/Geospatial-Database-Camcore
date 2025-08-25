@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHIRPS Precipitation Map</title>
+    <!-- Mapbox GL -->
+    <script src='https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.css' rel='stylesheet' />
+    <!-- Turf.js for spatial analysis -->
+    <script src='https://npmcdn.com/@turf/turf/turf.min.js'></script>
+    <!-- Chart.js for time series visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: Arial, sans-serif;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .header {
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .map-container {
+            width: 70%;
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        .chart-container {
+            width: 30%;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-section {
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            background-color: #fff;
+        }
+
+        .chart-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .chart-wrapper {
+            height: 200px;
+            position: relative;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            flex: 1;
+            min-width: 150px;
+            margin-bottom: 10px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        select,
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 8px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #loading {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.7);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 2s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            z-index: 1;
+        }
+
+        .legend-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .legend-scale {
+            display: flex;
+            height: 20px;
+            width: 200px;
+            margin-bottom: 5px;
+        }
+
+        .legend-labels {
+            display: flex;
+            justify-content: space-between;
+            width: 200px;
+            font-size: 12px;
+        }
+
+        .legend-color {
+            flex: 1;
+        }
+
+        .map-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            z-index: 1;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 5px;
+        }
+
+        .map-btn {
+            padding: 5px 10px;
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .map-btn.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .slider-container {
+            margin-top: 10px;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loading">
+        <div class="spinner"></div>
+        <div style="margin-top: 10px;">Loading data...</div>
+    </div>
+    <div class="container">
+        <div class="header">
+            <h1>CHIRPS Precipitation Map</h1>
+            <div class="controls">
+                <div class="form-group">
+                    <label for="min-lat">Min Latitude:</label>
+                    <input type="number" id="min-lat" step="0.0001" value="-39.020">
+                </div>
+                <div class="form-group">
+                    <label for="min-lon">Min Longitude:</label>
+                    <input type="number" id="min-lon" step="0.0001" value="-94.187">
+                </div>
+                <div class="form-group">
+                    <label for="max-lat">Max Latitude:</label>
+                    <input type="number" id="max-lat" step="0.0001" value="18.229">
+                </div>
+                <div class="form-group">
+                    <label for="max-lon">Max Longitude:</label>
+                    <input type="number" id="max-lon" step="0.0001" value="37.062">
+                </div>
+            </div>
+            <div class="controls">
+                <div class="form-group">
+                    <label for="start-date">Start Date:</label>
+                    <input type="date" id="start-date">
+                </div>
+                <div class="form-group">
+                    <label for="end-date">End Date:</label>
+                    <input type="date" id="end-date">
+                </div>
+                <div class="form-group">
+                    <label for="grid-size">Grid Size:</label>
+                    <select id="grid-size">
+                        <option value="5">5x5 (25 points)</option>
+                        <option value="10" selected>10x10 (100 points)</option>
+                        <option value="15">15x15 (225 points)</option>
+                        <option value="20">20x20 (400 points)</option>
+                        <option value="25">25x25 (625 points)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="aggregation">Aggregation:</label>
+                    <select id="aggregation">
+                        <option value="mean" selected>Mean</option>
+                        <option value="sum">Sum</option>
+                        <option value="max">Maximum</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>&nbsp;</label>
+                    <button id="fetch-data">Generate Precipitation Map</button>
+                </div>
+            </div>
+        </div>
+        <div class="content">
+            <div class="map-container">
+                <div id="map"></div>
+                <div class="map-controls">
+                    <div class="btn-group">
+                        <button class="map-btn active" id="heatmap-btn">Heatmap</button>
+                        <button class="map-btn" id="contour-btn">Contour</button>
+                        <button class="map-btn" id="grid-btn">Grid</button>
+                    </div>
+                    <div class="slider-container">
+                        <label for="opacity-slider">Opacity:</label>
+                        <div class="slider-label">
+                            <span>0%</span>
+                            <span>100%</span>
+                        </div>
+                        <input type="range" id="opacity-slider" min="0" max="1" step="0.1" value="0.7">
+                    </div>
+                </div>
+                <div class="legend">
+                    <div class="legend-title">Precipitation (mm)</div>
+                    <div class="legend-scale" id="legend-scale"></div>
+                    <div class="legend-labels">
+                        <span id="min-value">0</span>
+                        <span id="max-value">100</span>
+                    </div>
+                </div>
+            </div>
+            <div class="chart-container">
+                <div class="chart-section">
+                    <div class="chart-title">Time Series</div>
+                    <div class="chart-wrapper">
+                        <canvas id="time-series-chart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-section">
+                    <div class="chart-title">Monthly Averages</div>
+                    <div class="chart-wrapper">
+                        <canvas id="monthly-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // Mapbox token - replace with your token
+        mapboxgl.accessToken = 'pk.eyJ1IjoiaGFyc2hpdGFheSIsImEiOiJjbTl1b2FqMWwwYmx6Mm1vc2dsbjJuMDV5In0.zqokH_McYJWSzh8hAmu6bw';
+
+        // Global variables
+        let map;
+        let climateData = null;
+        let timeSeriesChart = null;
+        let monthlyChart = null;
+        let heatmapLayer = null;
+        let contourLayer = null;
+        let gridLayer = null;
+        let currentDisplayMode = 'heatmap';
+
+        // Color scale for precipitation
+        const precipColors = [
+            [0, 0, 255, 0],       // Light blue (low)
+            [0, 255, 255, 0.2],    // Cyan
+            [0, 255, 0, 0.4],      // Green
+            [255, 255, 0, 0.6],    // Yellow
+            [255, 128, 0, 0.8],    // Orange
+            [255, 0, 0, 1]         // Red (high)
+        ];
+
+        // Initialize date inputs
+        function setDefaultDates() {
+            const today = new Date();
+            const sixMonthsAgo = new Date();
+            sixMonthsAgo.setMonth(today.getMonth() - 6);
+
+            document.getElementById('end-date').value = formatDate(today);
+            document.getElementById('start-date').value = formatDate(sixMonthsAgo);
+        }
+
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        // Initialize charts
+        function initCharts() {
+            const timeSeriesCtx = document.getElementById('time-series-chart').getContext('2d');
+            timeSeriesChart = new Chart(timeSeriesCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Average Precipitation',
+                        data: [],
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Precipitation (mm)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        }
+                    }
+                }
+            });
+
+            const monthlyCtx = document.getElementById('monthly-chart').getContext('2d');
+            monthlyChart = new Chart(monthlyCtx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Monthly Average Precipitation',
+                        data: [],
+                        backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Precipitation (mm)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Fetch climate data or generate mock data
+        async function fetchClimateData() {
+            showLoading(true);
+
+            const minLat = document.getElementById('min-lat').value;
+            const minLon = document.getElementById('min-lon').value;
+            const maxLat = document.getElementById('max-lat').value;
+            const maxLon = document.getElementById('max-lon').value;
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            const gridSize = document.getElementById('grid-size').value;
+
+            try {
+                // Uncomment this to use the actual API when it's working
+                /*
+                const response = await fetch(`/climate-data-grid-samples/?min_lat=${minLat}&min_lon=${minLon}&max_lat=${maxLat}&max_lon=${maxLon}&start_date=${startDate}&end_date=${endDate}&data_source=chirps&variable=prec&grid_size=${gridSize}`);
+                
+                if (!response.ok) {
+                    throw new Error('Failed to fetch data from API');
+                }
+                
+                climateData = await response.json();
+                */
+
+                // For now, generate mock data
+                generateMockData();
+
+                // Process the climate data
+                processPrecipitationData();
+
+                // Update visualization components
+                // updateMap();
+                map.once('style.load', () => {
+                    updateMap();
+                });
+
+                updateTimeSeriesChart();
+                updateMonthlyChart();
+                updateLegend();
+
+            } catch (error) {
+                console.error('Error fetching climate data:', error);
+                // Fall back to mock data
+                generateMockData();
+                processPrecipitationData();
+                map.once('style.load', () => {
+                    updateMap();
+                });
+
+                updateTimeSeriesChart();
+                updateMonthlyChart();
+                updateLegend();
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Process precipitation data for visualization
+        function processPrecipitationData() {
+            if (!climateData || !climateData.points) return;
+
+            // Calculate average precipitation for each point
+            const aggregation = document.getElementById('aggregation').value;
+
+            climateData.points.forEach(point => {
+                let precipValue = 0;
+
+                if (aggregation === 'mean') {
+                    // Calculate mean precipitation
+                    let sum = 0;
+                    let count = 0;
+                    point.values.forEach(timePoint => {
+                        if (timePoint.values && timePoint.values.prec !== undefined) {
+                            sum += timePoint.values.prec;
+                            count++;
+                        }
+                    });
+                    precipValue = count > 0 ? sum / count : 0;
+                } else if (aggregation === 'sum') {
+                    // Calculate sum of precipitation
+                    point.values.forEach(timePoint => {
+                        if (timePoint.values && timePoint.values.prec !== undefined) {
+                            precipValue += timePoint.values.prec;
+                        }
+                    });
+                } else if (aggregation === 'max') {
+                    // Find maximum precipitation
+                    point.values.forEach(timePoint => {
+                        if (timePoint.values && timePoint.values.prec !== undefined) {
+                            precipValue = Math.max(precipValue, timePoint.values.prec);
+                        }
+                    });
+                }
+
+                // Store aggregated value
+                point.precipValue = precipValue;
+            });
+
+            // Find min and max values for color scale
+            let minPrecip = Infinity;
+            let maxPrecip = -Infinity;
+
+            climateData.points.forEach(point => {
+                if (point.precipValue !== undefined) {
+                    minPrecip = Math.min(minPrecip, point.precipValue);
+                    maxPrecip = Math.max(maxPrecip, point.precipValue);
+                }
+            });
+
+            // Store min/max values
+            climateData.minPrecip = minPrecip;
+            climateData.maxPrecip = maxPrecip;
+        }
+
+        // Update the map with precipitation data
+        function updateMap() {
+            if (!climateData || !climateData.points) return;
+
+            // Clear existing layers
+            if (heatmapLayer) map.removeLayer('heatmap-layer');
+            if (heatmapLayer) map.removeSource('heatmap-data');
+            if (contourLayer) map.removeLayer('contour-layer');
+            if (contourLayer) map.removeSource('contour-data');
+            if (gridLayer) map.removeLayer('grid-fill-layer');
+            if (gridLayer) map.removeLayer('grid-line-layer');
+            if (gridLayer) map.removeSource('grid-data');
+
+            // Create GeoJSON data for points
+            const geojsonPoints = {
+                type: 'FeatureCollection',
+                features: climateData.points.map(point => ({
+                    type: 'Feature',
+                    properties: {
+                        precip: point.precipValue,
+                        lat: point.lat,
+                        lon: point.lon
+                    },
+                    geometry: {
+                        type: 'Point',
+                        coordinates: [point.lon, point.lat]
+                    }
+                }))
+            };
+
+            // Get opacity value from slider
+            const opacity = parseFloat(document.getElementById('opacity-slider').value);
+
+            // Add heatmap layer
+            map.addSource('heatmap-data', {
+                type: 'geojson',
+                data: geojsonPoints
+            });
+
+            map.addLayer({
+                id: 'heatmap-layer',
+                type: 'heatmap',
+                source: 'heatmap-data',
+                paint: {
+                    'heatmap-weight': [
+                        'interpolate',
+                        ['linear'],
+                        ['get', 'precip'],
+                        climateData.minPrecip, 0,
+                        climateData.maxPrecip, 1
+                    ],
+                    'heatmap-intensity': 1,
+                    'heatmap-color': [
+                        'interpolate',
+                        ['linear'],
+                        ['heatmap-density'],
+                        0, 'rgba(0, 0, 255, 0)',
+                        0.2, 'rgba(0, 255, 255, 0.6)',
+                        0.4, 'rgba(0, 255, 0, 0.6)',
+                        0.6, 'rgba(255, 255, 0, 0.6)',
+                        0.8, 'rgba(255, 128, 0, 0.7)',
+                        1, 'rgba(255, 0, 0, 0.8)'
+                    ],
+                    'heatmap-radius': 20,
+                    'heatmap-opacity': opacity
+                },
+                layout: {
+                    visibility: currentDisplayMode === 'heatmap' ? 'visible' : 'none'
+                }
+            });
+
+            // Create grid cells for grid visualization
+            const gridCells = createGridCells();
+
+            // Add grid layer
+            map.addSource('grid-data', {
+                type: 'geojson',
+                data: gridCells
+            });
+
+            map.addLayer({
+                id: 'grid-fill-layer',
+                type: 'fill',
+                source: 'grid-data',
+                layout: {
+                    visibility: currentDisplayMode === 'grid' ? 'visible' : 'none'
+                },
+                paint: {
+                    'fill-color': [
+                        'interpolate',
+                        ['linear'],
+                        ['get', 'precip'],
+                        climateData.minPrecip, 'rgba(0, 0, 255, 0.6)',
+                        climateData.minPrecip + (climateData.maxPrecip - climateData.minPrecip) * 0.2, 'rgba(0, 255, 255, 0.6)',
+                        climateData.minPrecip + (climateData.maxPrecip - climateData.minPrecip) * 0.4, 'rgba(0, 255, 0, 0.6)',
+                        climateData.minPrecip + (climateData.maxPrecip - climateData.minPrecip) * 0.6, 'rgba(255, 255, 0, 0.6)',
+                        climateData.minPrecip + (climateData.maxPrecip - climateData.minPrecip) * 0.8, 'rgba(255, 128, 0, 0.7)',
+                        climateData.maxPrecip, 'rgba(255, 0, 0, 0.8)'
+                    ],
+                    'fill-opacity': opacity
+                }
+            });
+
+            map.addLayer({
+                id: 'grid-line-layer',
+                type: 'line',
+                source: 'grid-data',
+                layout: {
+                    visibility: currentDisplayMode === 'grid' ? 'visible' : 'none'
+                },
+                paint: {
+                    'line-color': '#000',
+                    'line-width': 0.5,
+                    'line-opacity': 0.5
+                }
+            });
+
+            // Create and add contour layer if Turf.js is available
+            try {
+                if (typeof turf !== 'undefined') {
+                    // Generate contour lines using Turf.js
+                    const bbox = [
+                        parseFloat(document.getElementById('min-lon').value),
+                        parseFloat(document.getElementById('min-lat').value),
+                        parseFloat(document.getElementById('max-lon').value),
+                        parseFloat(document.getElementById('max-lat').value)
+                    ];
+
+                    // Create contour lines
+                    const contourLines = createContourLines(geojsonPoints, bbox);
+
+                    // Add contour source and layer
+                    map.addSource('contour-data', {
+                        type: 'geojson',
+                        data: contourLines
+                    });
+
+                    map.addLayer({
+                        id: 'contour-layer',
+                        type: 'line',
+                        source: 'contour-data',
+                        layout: {
+                            visibility: currentDisplayMode === 'contour' ? 'visible' : 'none'
+                        },
+                        paint: {
+                            'line-color': [
+                                'interpolate',
+                                ['linear'],
+                                ['get', 'value'],
+                                climateData.minPrecip, 'rgba(0, 0, 255, 1)',
+                                climateData.minPrecip + (climateData.maxPrecip - climateData.minPrecip) * 0.2, 'rgba(0, 255, 255, 1)',
+                                climateData.minPrecip + (climateData.maxPrecip - climateData.minPrecip) * 0.4, 'rgba(0, 255, 0, 1)',
+                                climateData.minPrecip + (climateData.maxPrecip - climateData.minPrecip) * 0.6, 'rgba(255, 255, 0, 1)',
+                                climateData.minPrecip + (climateData.maxPrecip - climateData.minPrecip) * 0.8, 'rgba(255, 128, 0, 1)',
+                                climateData.maxPrecip, 'rgba(255, 0, 0, 1)'
+                            ],
+                            'line-width': 2,
+                            'line-opacity': opacity
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error('Error creating contour layer:', e);
+            }
+
+            // Fit map to bounds
+            const bounds = new mapboxgl.LngLatBounds(
+                [parseFloat(document.getElementById('min-lon').value), parseFloat(document.getElementById('min-lat').value)],
+                [parseFloat(document.getElementById('max-lon').value), parseFloat(document.getElementById('max-lat').value)]
+            );
+
+            map.fitBounds(bounds, { padding: 50 });
+        }
+
+        // Create grid cells for visualization
+        function createGridCells() {
+            const gridCells = {
+                type: 'FeatureCollection',
+                features: []
+            };
+
+            // Get grid size
+            const gridSize = parseInt(document.getElementById('grid-size').value);
+            const minLat = parseFloat(document.getElementById('min-lat').value);
+            const minLon = parseFloat(document.getElementById('min-lon').value);
+            const maxLat = parseFloat(document.getElementById('max-lat').value);
+            const maxLon = parseFloat(document.getElementById('max-lon').value);
+
+            const latStep = (maxLat - minLat) / gridSize;
+            const lonStep = (maxLon - minLon) / gridSize;
+
+            // Create grid cells
+            for (let i = 0; i < gridSize; i++) {
+                for (let j = 0; j < gridSize; j++) {
+                    const cellMinLat = minLat + i * latStep;
+                    const cellMinLon = minLon + j * lonStep;
+                    const cellMaxLat = minLat + (i + 1) * latStep;
+                    const cellMaxLon = minLon + (j + 1) * lonStep;
+
+                    // Find the nearest point to center of this cell
+                    const cellCenterLat = (cellMinLat + cellMaxLat) / 2;
+                    const cellCenterLon = (cellMinLon + cellMaxLon) / 2;
+
+                    // Find the nearest data point
+                    let nearestPoint = null;
+                    let minDistance = Infinity;
+
+                    for (const point of climateData.points) {
+                        const distance = Math.sqrt(
+                            Math.pow(point.lat - cellCenterLat, 2) +
+                            Math.pow(point.lon - cellCenterLon, 2)
+                        );
+
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            nearestPoint = point;
+                        }
+                    }
+
+                    // Create cell feature
+                    if (nearestPoint) {
+                        const cell = {
+                            type: 'Feature',
+                            properties: {
+                                precip: nearestPoint.precipValue
+                            },
+                            geometry: {
+                                type: 'Polygon',
+                                coordinates: [[
+                                    [cellMinLon, cellMinLat],
+                                    [cellMaxLon, cellMinLat],
+                                    [cellMaxLon, cellMaxLat],
+                                    [cellMinLon, cellMaxLat],
+                                    [cellMinLon, cellMinLat]
+                                ]]
+                            }
+                        };
+
+                        gridCells.features.push(cell);
+                    }
+                }
+            }
+
+            return gridCells;
+        }
+
+        // Create contour lines using Turf.js
+        function createContourLines(points, bbox) {
+            try {
+                // Calculate contour value breaks
+                const minVal = climateData.minPrecip;
+                const maxVal = climateData.maxPrecip;
+                const step = (maxVal - minVal) / 8;
+                const breaks = [];
+
+                for (let i = 0; i <= 8; i++) {
+                    breaks.push(minVal + i * step);
+                }
+
+                // Create a grid of points for interpolation
+                const cellWidth = 20;
+                const options = {
+                    gridType: 'points',
+                    property: 'precip',
+                    breaks: breaks
+                };
+
+                // Interpolate using IDW (Inverse Distance Weighting)
+                const grid = turf.interpolate(points, cellWidth, options);
+
+                // Generate isolines/contours
+                const contours = turf.isobands(grid, breaks, {
+                    zProperty: 'precip',
+                    commonProperties: {
+                        'fill-opacity': 0.6
+                    }
+                });
+
+                // Add value property to each feature for styling
+                contours.features.forEach(feature => {
+                    feature.properties.value = (feature.properties.precip + feature.properties.precip) / 2;
+                });
+
+                return contours;
+            } catch (e) {
+                console.error('Error creating contour lines:', e);
+                return {
+                    type: 'FeatureCollection',
+                    features: []
+                };
+            }
+        }
+
+        // Update time series chart
+        function updateTimeSeriesChart() {
+            if (!climateData || !climateData.average_series) return;
+
+            // Process time series data
+            const dates = [];
+            const values = [];
+
+            climateData.average_series.forEach(point => {
+                if (point.values && point.values.prec !== undefined) {
+                    dates.push(point.date);
+                    values.push(point.values.prec);
+                }
+            });
+
+            // Update chart
+            timeSeriesChart.data.labels = dates;
+            timeSeriesChart.data.datasets[0].data = values;
+            timeSeriesChart.update();
+        }
+
+        // Update monthly chart
+        function updateMonthlyChart() {
+            if (!climateData || !climateData.monthly_averages) return;
+
+            const labels = [];
+            const values = [];
+
+            climateData.monthly_averages.forEach(month => {
+                labels.push(`${getMonthName(month.month)} ${month.year}`);
+                values.push(month.value);
+            });
+
+            monthlyChart.data.labels = labels;
+            monthlyChart.data.datasets[0].data = values;
+            monthlyChart.update();
+        }
+
+        // Get month name from month number
+        function getMonthName(month) {
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            return monthNames[month - 1];
+        }
+
+        // Update legend
+        function updateLegend() {
+            if (!climateData) return;
+
+            const legendScale = document.getElementById('legend-scale');
+            const minValue = document.getElementById('min-value');
+            const maxValue = document.getElementById('max-value');
+
+            // Clear legend scale
+            legendScale.innerHTML = '';
+
+            // Create color gradient
+            for (let i = 0; i < precipColors.length; i++) {
+                const color = precipColors[i];
+                const segment = document.createElement('div');
+                segment.className = 'legend-color';
+                segment.style.backgroundColor = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${color[3]})`;
+                legendScale.appendChild(segment);
+            }
+
+            // Update min/max values
+            minValue.textContent = climateData.minPrecip ? climateData.minPrecip.toFixed(1) : '0';
+            maxValue.textContent = climateData.maxPrecip ? climateData.maxPrecip.toFixed(1) : '100';
+        }
+
+        // Show/hide loading indicator
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'flex' : 'none';
+        }
+
+        // Generate mock data for testing
+        function generateMockData() {
+            const minLat = parseFloat(document.getElementById('min-lat').value);
+            const minLon = parseFloat(document.getElementById('min-lon').value);
+            const maxLat = parseFloat(document.getElementById('max-lat').value);
+            const maxLon = parseFloat(document.getElementById('max-lon').value);
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            const gridSize = parseInt(document.getElementById('grid-size').value);
+
+            // Generate grid points
+            const points = [];
+            const latStep = (maxLat - minLat) / (gridSize - 1);
+            const lonStep = (maxLon - minLon) / (gridSize - 1);
+
+            for (let i = 0; i < gridSize; i++) {
+                for (let j = 0; j < gridSize; j++) {
+                    const lat = minLat + i * latStep;
+                    const lon = minLon + j * lonStep;
+
+                    // Create spatial pattern for precipitation (more rain near equator and coasts)
+                    const latFactor = 1 - Math.abs(lat) / 90; // More rain near equator
+                    const lonRandomFactor = Math.sin(lon * 0.1) * 0.5 + 0.5; // Random pattern based on longitude
+                    const spatialFactor = latFactor * lonRandomFactor * 3; // Combine factors
+
+                    // Generate time series data
+                    const values = [];
+                    let currentDate = new Date(startDate);
+                    const endDateObj = new Date(endDate);
+
+                    while (currentDate <= endDateObj) {
+                        // Generate seasonal pattern - more rain in "summer" months
+                        const dayOfYear = getDayOfYear(currentDate);
+                        const seasonalOffset = Math.sin((dayOfYear / 365) * Math.PI * 2);
+                        const month = currentDate.getMonth();
+
+                        // Northern/Southern hemisphere adjustment
+                        const hemisphereAdjust = lat > 0 ? 0 : 0.5; // Shift seasons for southern hemisphere
+                        const seasonalFactor = Math.sin(((month / 12) + hemisphereAdjust) * Math.PI * 2) * 0.7 + 0.3;
+
+                        // Random daily variation
+                        const randomFactor = Math.random() * 0.5;
+
+                        // Combine all factors for precipitation value
+                        let precipitation = Math.max(0, (spatialFactor * seasonalFactor + randomFactor) * 10);
+
+                        // Add occasional extreme events (heavy rainfall)
+                        if (Math.random() < 0.05) {
+                            precipitation *= (2 + Math.random() * 3); // 2-5x normal rainfall
+                        }
+
+                        values.push({
+                            date: currentDate.toISOString().split('T')[0],
+                            year: currentDate.getFullYear(),
+                            month: currentDate.getMonth() + 1,
+                            day: currentDate.getDate(),
+                            values: {
+                                prec: precipitation
+                            }
+                        });
+
+                        // Move to next day
+                        currentDate.setDate(currentDate.getDate() + 1);
+                    }
+
+                    points.push({
+                        lat,
+                        lon,
+                        values
+                    });
+                }
+            }
+
+            // Create average series
+            const dateMap = {};
+            points.forEach(point => {
+                point.values.forEach(timePoint => {
+                    const date = timePoint.date;
+                    if (!dateMap[date]) {
+                        dateMap[date] = {
+                            sum: 0,
+                            count: 0,
+                            date,
+                            year: timePoint.year,
+                            month: timePoint.month,
+                            day: timePoint.day
+                        };
+                    }
+                    dateMap[date].sum += timePoint.values.prec;
+                    dateMap[date].count++;
+                });
+            });
+
+            const average_series = Object.values(dateMap).map(item => ({
+                date: item.date,
+                year: item.year,
+                month: item.month,
+                day: item.day,
+                values: {
+                    prec: item.sum / item.count
+                }
+            })).sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            // Create monthly averages
+            const monthlyMap = {};
+            average_series.forEach(timePoint => {
+                const monthKey = `${timePoint.year}-${timePoint.month}`;
+                if (!monthlyMap[monthKey]) {
+                    monthlyMap[monthKey] = {
+                        sum: 0,
+                        count: 0,
+                        year: timePoint.year,
+                        month: timePoint.month
+                    };
+                }
+                monthlyMap[monthKey].sum += timePoint.values.prec;
+                monthlyMap[monthKey].count++;
+            });
+
+            const monthly_averages = Object.values(monthlyMap).map(item => ({
+                year: item.year,
+                month: item.month,
+                value: item.sum / item.count
+            })).sort((a, b) => {
+                if (a.year !== b.year) return a.year - b.year;
+                return a.month - b.month;
+            });
+
+            // Set climate data
+            climateData = {
+                bbox: [minLat, minLon, maxLat, maxLon],
+                data_source: 'chirps',
+                variable: 'prec',
+                grid_size: gridSize,
+                total_points: points.length,
+                points,
+                average_series,
+                monthly_averages,
+                start_date: startDate,
+                end_date: endDate,
+                cadence: 'daily'
+            };
+        }
+
+        // Get day of year (1-365/366)
+        function getDayOfYear(date) {
+            const start = new Date(date.getFullYear(), 0, 0);
+            const diff = date - start;
+            const oneDay = 1000 * 60 * 60 * 24;
+            return Math.floor(diff / oneDay);
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            // Set default dates
+            setDefaultDates();
+
+            // Initialize Mapbox map with flat projection
+            map = new mapboxgl.Map({
+                container: 'map',
+                style: 'mapbox://styles/mapbox/light-v11',
+                center: [-30, -10], // Center on Africa and South America
+                zoom: 2,
+                projection: 'mercator' // Use Mercator projection for flat map
+            });
+
+            // Add map controls
+            map.addControl(new mapboxgl.NavigationControl(), 'top-left');
+            map.addControl(new mapboxgl.ScaleControl(), 'bottom-left');
+
+            // Initialize charts
+            initCharts();
+
+            // Add event listeners
+            document.getElementById('fetch-data').addEventListener('click', fetchClimateData);
+
+            // Display mode buttons
+            document.getElementById('heatmap-btn').addEventListener('click', () => setDisplayMode('heatmap'));
+            document.getElementById('contour-btn').addEventListener('click', () => setDisplayMode('contour'));
+            document.getElementById('grid-btn').addEventListener('click', () => setDisplayMode('grid'));
+
+            // Opacity slider
+            document.getElementById('opacity-slider').addEventListener('input', updateLayerOpacity);
+
+            // Initialize with mock data on load
+            fetchClimateData();
+        });
+
+        // Set display mode
+        function setDisplayMode(mode) {
+            currentDisplayMode = mode;
+
+            // Update button states
+            document.querySelectorAll('.map-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById(`${mode}-btn`).classList.add('active');
+
+            // Update layer visibility
+            if (map.getLayer('heatmap-layer')) {
+                map.setLayoutProperty('heatmap-layer', 'visibility',
+                    mode === 'heatmap' ? 'visible' : 'none');
+            }
+
+            if (map.getLayer('contour-layer')) {
+                map.setLayoutProperty('contour-layer', 'visibility',
+                    mode === 'contour' ? 'visible' : 'none');
+            }
+
+            if (map.getLayer('grid-fill-layer')) {
+                map.setLayoutProperty('grid-fill-layer', 'visibility',
+                    mode === 'grid' ? 'visible' : 'none');
+                map.setLayoutProperty('grid-line-layer', 'visibility',
+                    mode === 'grid' ? 'visible' : 'none');
+            }
+        }
+
+        // Update layer opacity
+        function updateLayerOpacity() {
+            const opacity = parseFloat(document.getElementById('opacity-slider').value);
+
+            if (map.getLayer('heatmap-layer')) {
+                map.setPaintProperty('heatmap-layer', 'heatmap-opacity', opacity);
+            }
+
+            if (map.getLayer('contour-layer')) {
+                map.setPaintProperty('contour-layer', 'line-opacity', opacity);
+            }
+
+            if (map.getLayer('grid-fill-layer')) {
+                map.setPaintProperty('grid-fill-layer', 'fill-opacity', opacity);
+            }
+        }
+    </script>
+</body>
+
+</html>

@@ -11,6 +11,7 @@ import glob
 import zipfile
 import shutil
 
+
 # Add virtual environment site-packages to path
 venv_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Api-v1", "venv"))
 if sys.platform == 'win32':
@@ -139,6 +140,7 @@ def group_selected_vars_by_source(selected_set):
         src, var = key.split(':', 1)
         by_source[src].append(var)
     return by_source
+
 
 def zip_batches(batch_pattern, zip_output_path):
     import glob

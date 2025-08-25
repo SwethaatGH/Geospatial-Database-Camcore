@@ -1,0 +1,1470 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHIRPS Precipitation Explorer</title>
+    <!-- Mapbox GL -->
+    <script src='https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.css' rel='stylesheet' />
+    <!-- Chart.js for time series visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: Arial, sans-serif;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .header {
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .map-container {
+            width: 60%;
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        .chart-container {
+            width: 40%;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-section {
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            background-color: #fff;
+        }
+
+        .chart-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .chart-wrapper {
+            height: 200px;
+            position: relative;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            flex: 1;
+            min-width: 200px;
+            margin-bottom: 10px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        select,
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 8px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .button-sm {
+            padding: 5px 10px;
+            font-size: 12px;
+
+
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        }
+
+        button {
+            padding: 8px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 20px;
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 5px;
+            text-align: center;
+            z-index: 1000;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .marker {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid white;
+        }
+
+        .marker.selected {
+            border-color: #000;
+            box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5);
+            width: 18px;
+            height: 18px;
+        }
+
+        .stats-panel {
+            margin-top: 15px;
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .stat-box {
+            background-color: #f9f9f9;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+
+        #loading {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.7);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 2s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .aggregation-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .radio-label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .radio-label input {
+            margin-right: 5px;
+            width: auto;
+        }
+
+        /* Timelapse controls */
+        .timelapse-controls {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+
+        .timelapse-slider {
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        .timelapse-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .map-overlay {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.8);
+            margin-right: 20px;
+            margin-bottom: 20px;
+            padding: 10px;
+            border-radius: 3px;
+        }
+
+        /* Heatmap legend */
+        .legend {
+            background-color: white;
+            border-radius: 3px;
+            bottom: 30px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+            padding: 10px;
+            position: absolute;
+            left: 10px;
+            z-index: 1;
+        }
+
+        .legend h4 {
+            margin: 0 0 10px;
+        }
+
+        .legend div {
+            height: 10px;
+            width: 100%;
+            margin-bottom: 5px;
+        }
+
+        .legend-key {
+            display: inline-block;
+            width: 100%;
+            height: 10px;
+            margin-bottom: 5px;
+        }
+
+        /* Map point markers */
+        .map-point {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            border: 1px solid white;
+            cursor: pointer;
+            background-color: #333;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loading">
+        <div class="spinner"></div>
+        <div style="margin-top: 10px;">Loading data...</div>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1>CHIRPS Precipitation Explorer</h1>
+            <div class="controls">
+                <div class="form-group">
+                    <label for="start-date">Start Date:</label>
+                    <input type="date" id="start-date">
+                </div>
+                <div class="form-group">
+                    <label for="end-date">End Date:</label>
+                    <input type="date" id="end-date">
+                </div>
+                <div class="form-group">
+                    <label for="grid-size">Grid Size:</label>
+                    <select id="grid-size">
+                        <option value="5" selected>5x5 (25 points)</option>
+                        <option value="6">6x6 (36 points)</option>
+                        <option value="7">7x7 (49 points)</option>
+                        <option value="8">8x8 (64 points)</option>
+                        <option value="9">9x9 (81 points)</option>
+                        <option value="10">10x10 (100 points)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>&nbsp;</label>
+                    <button id="fetch-data">Fetch Data</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="map-container">
+                <div id="map"></div>
+                <!-- Legend for heatmap -->
+                <div id="legend" class="legend">
+                    <h4>Precipitation (mm/day)</h4>
+                    <div id="gradient"></div>
+                    <div>
+                        <span id="legend-min">0</span>
+                        <span id="legend-max" style="float: right;">50+</span>
+                    </div>
+                </div>
+                <!-- Timelapse controls -->
+                <div id="timelapse-controls" class="map-overlay timelapse-controls">
+                    <div id="timelapse-date">Date: <span id="current-date">-</span></div>
+                    <input type="range" min="0" value="0" class="timelapse-slider" id="timelapse-slider">
+                    <div class="timelapse-buttons">
+                        <button id="play-button">Play</button>
+                        <button id="pause-button">Pause</button>
+                        <button id="reset-button">Reset</button>
+                        <button id="toggle-points-button" class="button-sm">Hide Points</button>
+                    </div>
+                </div>
+            </div>
+            <div class="chart-container">
+                <div class="chart-section">
+                    <div class="chart-title">Precipitation Time Series</div>
+                    <div class="aggregation-controls">
+                        <span>View Mode:</span>
+                        <div class="radio-group">
+                            <label class="radio-label">
+                                <input type="radio" name="view-mode" value="daily" checked>
+                                Daily
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="view-mode" value="monthly">
+                                Monthly
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="view-mode" value="average">
+                                Regional Average
+                            </label>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="time-series-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-section">
+                    <div class="chart-title">Monthly Precipitation</div>
+                    <div class="chart-wrapper">
+                        <canvas id="monthly-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-section" id="stats-section">
+                    <div class="chart-title">Statistics</div>
+                    <div class="stats-panel">
+                        <div class="stats-grid">
+                            <div class="stat-box">
+                                <div>Average Precipitation</div>
+                                <div class="stat-value" id="avg-precip">-</div>
+                                <div>mm/day</div>
+                            </div>
+                            <div class="stat-box">
+                                <div>Maximum Precipitation</div>
+                                <div class="stat-value" id="max-precip">-</div>
+                                <div>mm/day</div>
+                            </div>
+                            <div class="stat-box">
+                                <div>Minimum Precipitation</div>
+                                <div class="stat-value" id="min-precip">-</div>
+                                <div>mm/day</div>
+                            </div>
+                            <div class="stat-box">
+                                <div>Total Precipitation</div>
+                                <div class="stat-value" id="total-precip">-</div>
+                                <div>mm</div>
+                            </div>
+                            <div class="stat-box">
+                                <div>Wet Days</div>
+                                <div class="stat-value" id="wet-days">-</div>
+                                <div>days</div>
+                            </div>
+                            <div class="stat-box">
+                                <div>Dry Days</div>
+                                <div class="stat-value" id="dry-days">-</div>
+                                <div>days</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mapbox token - replace with your token
+        mapboxgl.accessToken = 'pk.eyJ1IjoiaGFyc2hpdGFheSIsImEiOiJjbTl1b2FqMWwwYmx6Mm1vc2dsbjJuMDV5In0.zqokH_McYJWSzh8hAmu6bw';
+
+        // Global variables
+        let map;
+        let markers = [];
+        let climateData = null;
+        let selectedPointIndex = -1;
+        let timeSeriesChart = null;
+        let monthlyChart = null;
+        let timelapseInterval = null;
+        let currentTimelapseIndex = 0;
+        let heatmapLayer = null;
+        let heatmapData = [];
+        let minPrecip = 0;
+        let maxPrecip = 50;  // Default max for legend
+
+        // Default bbox coordinates (covering parts of Africa and South America)
+        const DEFAULT_MIN_LAT = -39.020;
+        const DEFAULT_MIN_LON = -94.187;
+        const DEFAULT_MAX_LAT = 18.229;
+        const DEFAULT_MAX_LON = 37.062;
+
+        // Initialize date inputs
+        function setDefaultDates() {
+            const today = new Date();
+            const fourMonthsAgo = new Date();
+            fourMonthsAgo.setMonth(today.getMonth() - 4);
+
+            document.getElementById('end-date').value = formatDate(today);
+            document.getElementById('start-date').value = formatDate(fourMonthsAgo);
+        }
+
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        // Initialize charts
+        function initCharts() {
+            const timeSeriesCtx = document.getElementById('time-series-chart').getContext('2d');
+            timeSeriesChart = new Chart(timeSeriesCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: []
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Precipitation (mm)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        }
+                    }
+                }
+            });
+
+            const monthlyCtx = document.getElementById('monthly-chart').getContext('2d');
+            monthlyChart = new Chart(monthlyCtx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Monthly Average Precipitation',
+                        data: [],
+                        backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Precipitation (mm/day)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Month'
+                            },
+                            ticks: {
+                                autoSkip: true,
+                                maxTicksLimit: 12 // Show a reasonable number of month labels
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize heatmap legend
+        function initLegend() {
+            const legend = document.getElementById('legend');
+            const gradient = document.getElementById('gradient');
+
+            // Create color gradient for the legend with more varied colors
+            const colors = [
+                'rgba(0, 0, 255, 0)',      // Transparent blue (for 0)
+                'rgba(0, 130, 255, 0.6)',  // Light blue
+                'rgba(0, 255, 255, 0.6)',  // Cyan
+                'rgba(0, 255, 130, 0.6)',  // Teal
+                'rgba(0, 255, 0, 0.6)',    // Green
+                'rgba(130, 255, 0, 0.6)',  // Lime
+                'rgba(255, 255, 0, 0.6)',  // Yellow
+                'rgba(255, 165, 0, 0.6)',  // Orange
+                'rgba(255, 80, 0, 0.6)',   // Dark orange
+                'rgba(255, 0, 0, 0.6)'     // Red
+            ];
+
+            const linearGradient = `linear-gradient(to right, ${colors.join(', ')})`;
+            gradient.style.background = linearGradient;
+
+            document.getElementById('legend-min').textContent = '0';
+            document.getElementById('legend-max').textContent = '50+';
+        }
+
+        // Fetch climate data
+        async function fetchClimateData() {
+            showLoading(true);
+
+            // Validate date range (max 4 months)
+            const startDate = new Date(document.getElementById('start-date').value);
+            const endDate = new Date(document.getElementById('end-date').value);
+
+            // Calculate difference in months
+            const monthsDiff = (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+                (endDate.getMonth() - startDate.getMonth());
+
+            if (monthsDiff > 4) {
+                alert('Please select a date range of 4 months or less to avoid UI overload.');
+                showLoading(false);
+                return;
+            }
+
+            const startDateStr = document.getElementById('start-date').value;
+            const endDateStr = document.getElementById('end-date').value;
+            const gridSize = document.getElementById('grid-size').value;
+
+            try {
+                console.log(`Fetching data from ${startDateStr} to ${endDateStr} with grid size ${gridSize}`);
+
+                // Using default bbox
+                const response = await fetch(`/climate-data-grid-samples/?min_lat=${DEFAULT_MIN_LAT}&min_lon=${DEFAULT_MIN_LON}&max_lat=${DEFAULT_MAX_LAT}&max_lon=${DEFAULT_MAX_LON}&start_date=${startDateStr}&end_date=${endDateStr}&data_source=chirps&variable=prec&grid_size=${gridSize}`);
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch data from API');
+                }
+
+                climateData = await response.json();
+
+                if (!climateData.points || climateData.points.length === 0) {
+                    throw new Error('No data points found in the selected area');
+                }
+
+                console.log('Data received:', climateData);
+
+                // Update map and charts
+                updateMapMarkers();
+                prepareHeatmapData();
+                updateHeatmap(0);
+                initializeTimelapseControls();
+
+                // Select the regional average by default
+                selectPoint(-1);
+
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+                console.error(error);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Prepare heatmap data from climate data
+        function prepareHeatmapData() {
+            heatmapData = [];
+
+            if (!climateData || !climateData.points) return;
+
+            // Get all unique dates from the data
+            const allDates = new Set();
+            climateData.points.forEach(point => {
+                point.values.forEach(timePoint => {
+                    allDates.add(timePoint.date);
+                });
+            });
+
+            // Sort dates
+            const sortedDates = Array.from(allDates).sort();
+
+            // For each date, create a frame of heatmap data
+            sortedDates.forEach(date => {
+                const frameData = {
+                    date: date,
+                    points: []
+                };
+
+                // Add each point's value for this date
+                climateData.points.forEach(point => {
+                    const timePoint = point.values.find(tp => tp.date === date);
+                    if (timePoint && timePoint.values && timePoint.values.prec !== undefined) {
+                        frameData.points.push({
+                            lat: point.lat,
+                            lng: point.lon,
+                            value: timePoint.values.prec
+                        });
+
+                        // Update min/max for legend
+                        if (timePoint.values.prec > maxPrecip) {
+                            maxPrecip = timePoint.values.prec;
+                        }
+                    }
+                });
+
+                heatmapData.push(frameData);
+            });
+
+            // Update legend max value
+            document.getElementById('legend-max').textContent = `${Math.ceil(maxPrecip)}+`;
+
+            // Update slider
+            const slider = document.getElementById('timelapse-slider');
+            slider.max = heatmapData.length - 1;
+            slider.value = 0;
+        }
+
+        // Create a full bbox heatmap (interpolated from points)
+        function createFullBboxHeatmap() {
+            if (!climateData || !climateData.points) return;
+
+            // This function will be called when we have a slider event
+            // or when a timelapse frame changes
+
+            // Use existing data to interpolate values across the entire bbox
+            // This implementation will depend on your specific needs, but here's a simple approach:
+
+            // 1. Calculate the number of grid cells for interpolation (more cells = smoother but slower)
+            const GRID_CELLS = 50; // 50x50 grid for interpolation
+
+            // 2. Calculate step sizes
+            const latStep = (DEFAULT_MAX_LAT - DEFAULT_MIN_LAT) / GRID_CELLS;
+            const lonStep = (DEFAULT_MAX_LON - DEFAULT_MIN_LON) / GRID_CELLS;
+
+            // 3. Generate interpolated grid
+            const interpolatedGrid = [];
+
+            for (let latIdx = 0; latIdx <= GRID_CELLS; latIdx++) {
+                for (let lonIdx = 0; lonIdx <= GRID_CELLS; lonIdx++) {
+                    const lat = DEFAULT_MIN_LAT + latIdx * latStep;
+                    const lon = DEFAULT_MIN_LON + lonIdx * lonStep;
+
+                    interpolatedGrid.push({
+                        lat: lat,
+                        lng: lon,
+                        value: 0 // Will be set during interpolation
+                    });
+                }
+            }
+
+            return interpolatedGrid;
+        }
+
+        // Initialize timelapse controls
+        function initializeTimelapseControls() {
+            const slider = document.getElementById('timelapse-slider');
+            const playButton = document.getElementById('play-button');
+            const pauseButton = document.getElementById('pause-button');
+            const resetButton = document.getElementById('reset-button');
+
+            slider.max = heatmapData.length - 1;
+            slider.value = 0;
+
+            slider.addEventListener('input', function () {
+                currentTimelapseIndex = parseInt(this.value);
+                updateHeatmap(currentTimelapseIndex);
+            });
+
+            playButton.addEventListener('click', startTimelapse);
+            pauseButton.addEventListener('click', pauseTimelapse);
+            resetButton.addEventListener('click', resetTimelapse);
+
+            // Update current date display
+            if (heatmapData.length > 0) {
+                document.getElementById('current-date').textContent = heatmapData[0].date;
+            }
+        }
+
+        // Start timelapse animation
+        function startTimelapse() {
+            if (timelapseInterval) {
+                clearInterval(timelapseInterval);
+            }
+
+            timelapseInterval = setInterval(() => {
+                currentTimelapseIndex++;
+                if (currentTimelapseIndex >= heatmapData.length) {
+                    currentTimelapseIndex = 0;
+                }
+
+                document.getElementById('timelapse-slider').value = currentTimelapseIndex;
+                updateHeatmap(currentTimelapseIndex);
+            }, 500); // Update every 500ms
+        }
+
+        // Pause timelapse
+        function pauseTimelapse() {
+            if (timelapseInterval) {
+                clearInterval(timelapseInterval);
+                timelapseInterval = null;
+            }
+        }
+
+        // Reset timelapse
+        function resetTimelapse() {
+            pauseTimelapse();
+            currentTimelapseIndex = 0;
+            document.getElementById('timelapse-slider').value = 0;
+            updateHeatmap(0);
+        }
+
+        // Update heatmap for a specific frame
+        function updateHeatmap(frameIndex) {
+            if (!heatmapData || heatmapData.length === 0 || frameIndex >= heatmapData.length) return;
+
+            const frame = heatmapData[frameIndex];
+            document.getElementById('current-date').textContent = frame.date;
+
+            // Remove existing heatmap layer
+            if (map.getSource('heatmap-source')) {
+                map.removeLayer('heatmap-layer');
+                map.removeSource('heatmap-source');
+            }
+
+            // Create GeoJSON data for the heatmap
+            const geojson = {
+                'type': 'FeatureCollection',
+                'features': frame.points.map(point => ({
+                    'type': 'Feature',
+                    'properties': {
+                        'precipitation': point.value
+                    },
+                    'geometry': {
+                        'type': 'Point',
+                        'coordinates': [point.lng, point.lat]
+                    }
+                }))
+            };
+
+            // Add source and layer
+            map.addSource('heatmap-source', {
+                'type': 'geojson',
+                'data': geojson
+            });
+
+            // Add the full heatmap layer that covers the entire bbox
+            map.addLayer({
+                'id': 'heatmap-layer',
+                'type': 'heatmap',
+                'source': 'heatmap-source',
+                'paint': {
+                    // Increase the heatmap weight based on precipitation
+                    'heatmap-weight': [
+                        'interpolate',
+                        ['linear'],
+                        ['get', 'precipitation'],
+                        0, 0,
+                        maxPrecip, 1
+                    ],
+                    // Increase the heatmap intensity for better visibility
+                    'heatmap-intensity': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        0, 1,
+                        9, 3
+                    ],
+                    // Color ramp for heatmap with more varied colors
+                    'heatmap-color': [
+                        'interpolate',
+                        ['linear'],
+                        ['heatmap-density'],
+                        0, 'rgba(0, 0, 255, 0)',
+                        0.1, 'rgba(0, 130, 255, 0.6)',
+                        0.2, 'rgba(0, 255, 255, 0.6)',
+                        0.3, 'rgba(0, 255, 130, 0.6)',
+                        0.4, 'rgba(0, 255, 0, 0.6)',
+                        0.5, 'rgba(130, 255, 0, 0.6)',
+                        0.6, 'rgba(255, 255, 0, 0.6)',
+                        0.7, 'rgba(255, 200, 0, 0.6)',
+                        0.8, 'rgba(255, 165, 0, 0.6)',
+                        0.9, 'rgba(255, 80, 0, 0.6)',
+                        1, 'rgba(255, 0, 0, 0.6)'
+                    ],
+                    // Adjust the heatmap radius to create a much smoother effect
+                    'heatmap-radius': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        0, 30,  // Much larger radius at lower zoom levels
+                        9, 60   // Even larger at higher zoom levels
+                    ],
+                    // Keep the heatmap fully visible at all zoom levels
+                    'heatmap-opacity': 0.8
+                }
+            });
+
+            // Update the monthly chart if needed
+            if (selectedPointIndex !== -1) {
+                updateMonthlyChart();
+            }
+        }
+      
+
+        // Update map markers
+        function updateMapMarkers() {
+            // Clear existing markers
+            markers.forEach(marker => marker.remove());
+            markers = [];
+
+            // Add new markers for points
+            if (!climateData || !climateData.points) return;
+
+            climateData.points.forEach((point, index) => {
+                // Create marker element
+                const el = document.createElement('div');
+                el.className = 'map-point';
+
+                // Create mapbox marker
+                const marker = new mapboxgl.Marker(el)
+                    .setLngLat([point.lon, point.lat])
+                    .addTo(map);
+
+                // Add click event to select this point
+                el.addEventListener('click', () => {
+                    selectPoint(index);
+                });
+
+                markers.push(marker);
+            });
+
+            // Fit map to the bounding box
+            map.fitBounds([
+                [DEFAULT_MIN_LON, DEFAULT_MIN_LAT],
+                [DEFAULT_MAX_LON, DEFAULT_MAX_LAT]
+            ], { padding: 50 });
+        }
+
+        // Select a point and update visualizations
+        function selectPoint(index) {
+            selectedPointIndex = index;
+
+            console.log(`Point selected: ${index}`);
+
+            // Update marker styling to show which point is selected
+            markers.forEach((marker, i) => {
+                const el = marker.getElement();
+                if (i === index) {
+                    el.style.backgroundColor = '#ff3300';
+                    el.style.width = '10px';
+                    el.style.height = '10px';
+                    el.style.zIndex = 10;
+                } else {
+                    el.style.backgroundColor = '#333';
+                    el.style.width = '8px';
+                    el.style.height = '8px';
+                    el.style.zIndex = 5;
+                }
+            });
+
+            // Update time series chart based on view mode
+            updateTimeSeriesChart();
+
+            // Update monthly chart to show data for the selected point
+            updateMonthlyChart();
+
+            // Update statistics
+            updateStatistics();
+        }
+
+        // Update time series chart based on selected point and view mode
+        function updateTimeSeriesChart() {
+            if (!climateData) return;
+
+            // Get current view mode
+            const viewMode = document.querySelector('input[name="view-mode"]:checked').value;
+
+            // Clear existing datasets
+            timeSeriesChart.data.datasets = [];
+
+            if (viewMode === 'daily') {
+                // Show daily precipitation for selected point
+                if (selectedPointIndex >= 0 && selectedPointIndex < climateData.points.length) {
+                    // Single point view
+                    const point = climateData.points[selectedPointIndex];
+                    const dates = [];
+                    const values = [];
+
+                    point.values.forEach(timePoint => {
+                        if (timePoint.values && timePoint.values.prec !== undefined) {
+                            dates.push(timePoint.date);
+                            values.push(timePoint.values.prec);
+                        }
+                    });
+
+                    timeSeriesChart.data.labels = dates;
+                    timeSeriesChart.data.datasets.push({
+                        label: `Point ${selectedPointIndex + 1} Precipitation`,
+                        data: values,
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        borderWidth: 1,
+                        fill: true
+                    });
+
+                    // Set tick options to ensure all dates are visible
+                    timeSeriesChart.options.scales.x.ticks = {
+                        autoSkip: true,
+                        maxTicksLimit: 20 // Show a reasonable number of date labels
+                    };
+                } else if (selectedPointIndex === -1) {
+                    // Show regional average
+                    timeSeriesChart.data.labels = climateData.average_series.map(d => d.date);
+                    timeSeriesChart.data.datasets.push({
+                        label: 'Regional Average',
+                        data: climateData.average_series.map(d => d.values.prec),
+                        borderColor: '#000',
+                        backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                        borderWidth: 2,
+                        fill: true
+                    });
+
+                    // Set tick options for regional average
+                    timeSeriesChart.options.scales.x.ticks = {
+                        autoSkip: true,
+                        maxTicksLimit: 20
+                    };
+                }
+            } else if (viewMode === 'monthly') {
+                // Show monthly aggregated data
+                if (selectedPointIndex >= 0 && selectedPointIndex < climateData.points.length) {
+                    // Aggregate monthly data for selected point
+                    const monthlyData = aggregateMonthlyData(climateData.points[selectedPointIndex].values);
+
+                    timeSeriesChart.data.labels = monthlyData.labels;
+                    timeSeriesChart.data.datasets.push({
+                        label: `Point ${selectedPointIndex + 1} Monthly Average`,
+                        data: monthlyData.values,
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        borderWidth: 1,
+                        fill: true
+                    });
+
+                    // Set tick options for monthly view
+                    timeSeriesChart.options.scales.x.ticks = {
+                        autoSkip: true,
+                        maxTicksLimit: 12
+                    };
+                } else if (selectedPointIndex === -1) {
+                    // Show monthly average for all points
+                    const monthlyData = {
+                        labels: [],
+                        values: []
+                    };
+
+                    climateData.monthly_averages.forEach(month => {
+                        monthlyData.labels.push(`${month.year}-${month.month.toString().padStart(2, '0')}`);
+                        monthlyData.values.push(month.value);
+                    });
+
+                    timeSeriesChart.data.labels = monthlyData.labels;
+                    timeSeriesChart.data.datasets.push({
+                        label: 'Regional Monthly Average',
+                        data: monthlyData.values,
+                        borderColor: '#000',
+                        backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                        borderWidth: 2,
+                        fill: true
+                    });
+
+                    // Set tick options for monthly view
+                    timeSeriesChart.options.scales.x.ticks = {
+                        autoSkip: true,
+                        maxTicksLimit: 12
+                    };
+                }
+            } else if (viewMode === 'average') {
+                // Show only the regional average
+                timeSeriesChart.data.labels = climateData.average_series.map(d => d.date);
+                timeSeriesChart.data.datasets.push({
+                    label: 'Regional Average Precipitation',
+                    data: climateData.average_series.map(d => d.values.prec),
+                    borderColor: '#000',
+                    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                    borderWidth: 2,
+                    fill: true
+                });
+
+                // Set tick options for average view
+                timeSeriesChart.options.scales.x.ticks = {
+                    autoSkip: true,
+                    maxTicksLimit: 20
+                };
+            }
+
+            timeSeriesChart.update();
+        }
+
+        // Aggregate monthly data from daily time series
+        function aggregateMonthlyData(timeValues) {
+            const monthlyData = {};
+
+            timeValues.forEach(timePoint => {
+                if (!timePoint.values || timePoint.values.prec === undefined) return;
+
+                const monthKey = `${timePoint.year}-${timePoint.month.toString().padStart(2, '0')}`;
+
+                if (!monthlyData[monthKey]) {
+                    monthlyData[monthKey] = {
+                        sum: 0,
+                        count: 0,
+                        year: timePoint.year,
+                        month: timePoint.month
+                    };
+                }
+
+                monthlyData[monthKey].sum += timePoint.values.prec;
+                monthlyData[monthKey].count++;
+            });
+
+            // Convert to arrays for chart
+            const labels = [];
+            const values = [];
+
+            // Sort all dates chronologically regardless of year
+            Object.keys(monthlyData).sort().forEach(monthKey => {
+                labels.push(monthKey);
+                values.push(monthlyData[monthKey].sum / monthlyData[monthKey].count);
+            });
+
+            return { labels, values };
+        }
+
+        function formatYearMonth(year, month) {
+            // Convert month to string with leading zero if needed
+            const monthStr = month.toString().padStart(2, '0');
+            return `${year}-${monthStr}`;
+        }
+
+        // Update monthly chart with data from selected point or regional average
+        function updateMonthlyChart() {
+            if (!climateData) return;
+
+            console.log("Updating monthly chart, selected point:", selectedPointIndex);
+
+            const labels = [];
+            const values = [];
+
+            if (selectedPointIndex >= 0 && selectedPointIndex < climateData.points.length) {
+                // Show monthly data for the selected point
+                console.log("Processing point data for monthly chart");
+                const point = climateData.points[selectedPointIndex];
+                const monthlyData = aggregateMonthlyData(point.values);
+
+                console.log("Monthly data:", monthlyData);
+
+                // Process all available months
+                monthlyData.labels.forEach((monthKey, index) => {
+                    const [year, month] = monthKey.split('-');
+                    const monthName = getMonthName(parseInt(month));
+                    labels.push(`${monthName} ${year}`);
+                    values.push(monthlyData.values[index]);
+                });
+            } else {
+                // Show regional average monthly data
+                console.log("Processing regional average data for monthly chart");
+                console.log("Monthly averages:", climateData.monthly_averages);
+
+                climateData.monthly_averages.forEach(month => {
+                    const monthName = getMonthName(month.month);
+                    labels.push(`${monthName} ${month.year}`);
+                    values.push(month.value);
+                });
+            }
+
+            console.log("Chart labels:", labels);
+            console.log("Chart values:", values);
+
+            monthlyChart.data.labels = labels;
+            monthlyChart.data.datasets[0].data = values;
+            monthlyChart.data.datasets[0].label = selectedPointIndex >= 0 ?
+                `Point ${selectedPointIndex + 1} Monthly Average` : 'Regional Monthly Average';
+
+            // Configure x-axis to handle all months
+            monthlyChart.options.scales.x.ticks = {
+                autoSkip: true,
+                maxTicksLimit: 12 // Show a reasonable number of month labels
+            };
+
+            monthlyChart.update('none'); // Use 'none' animation for immediate update
+        }
+
+        // Get month name from month number
+        function getMonthName(month) {
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            return monthNames[month - 1];
+        }
+
+        // Update statistics based on selected point or regional average
+        function updateStatistics() {
+            if (!climateData) return;
+
+            let values = [];
+
+            if (selectedPointIndex >= 0 && selectedPointIndex < climateData.points.length) {
+                // Get values for selected point
+                const point = climateData.points[selectedPointIndex];
+                values = point.values
+                    .filter(tv => tv.values && tv.values.prec !== undefined)
+                    .map(tv => tv.values.prec);
+            } else {
+                // Get values for regional average
+                values = climateData.average_series
+                    .filter(tv => tv.values && tv.values.prec !== undefined)
+                    .map(tv => tv.values.prec);
+            }
+
+            if (values.length === 0) return;
+
+            // Calculate statistics
+            const avg = values.reduce((sum, val) => sum + val, 0) / values.length;
+            const max = Math.max(...values);
+            const min = Math.min(...values);
+            const total = values.reduce((sum, val) => sum + val, 0);
+            const wetDays = values.filter(val => val >= 1).length;  // Days with at least 1mm rain
+            const dryDays = values.length - wetDays;
+
+            // Update statistics display
+            document.getElementById('avg-precip').textContent = avg.toFixed(2);
+            document.getElementById('max-precip').textContent = max.toFixed(2);
+            document.getElementById('min-precip').textContent = min.toFixed(2);
+            document.getElementById('total-precip').textContent = total.toFixed(2);
+            document.getElementById('wet-days').textContent = wetDays;
+            document.getElementById('dry-days').textContent = dryDays;
+        }
+
+        // Toggle points visibility
+        let pointsVisible = true;
+
+        function togglePoints() {
+            const button = document.getElementById('toggle-points-button');
+
+            pointsVisible = !pointsVisible;
+
+            // Update button text
+            button.textContent = pointsVisible ? 'Hide Points' : 'Show Points';
+
+            // Hide/show all markers
+            markers.forEach(marker => {
+                const el = marker.getElement();
+                el.style.display = pointsVisible ? 'block' : 'none';
+            });
+        }
+
+        // Show/hide loading indicator
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'flex' : 'none';
+        }
+        // Set default dates
+        setDefaultDates();
+
+        // Initialize Mapbox map with flat projection
+        map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/light-v11',
+            center: [-30, -10], // Center on Africa and South America
+            zoom: 2,
+            projection: {
+                name: 'mercator' // Use flat Mercator projection
+            }
+        });
+
+        // Add map controls
+        map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+        // Initialize charts
+        initCharts();
+
+        // Initialize heatmap legend
+        initLegend();
+
+        // Add event listeners
+        document.getElementById('fetch-data').addEventListener('click', fetchClimateData);
+
+        // Add toggle points button functionality
+        document.getElementById('toggle-points-button').addEventListener('click', togglePoints);
+
+        // Add event listener for checking date range
+        document.getElementById('fetch-data').addEventListener('click', function (e) {
+            const startDate = new Date(document.getElementById('start-date').value);
+            const endDate = new Date(document.getElementById('end-date').value);
+
+            // Calculate difference in months
+            const monthsDiff = (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+                (endDate.getMonth() - startDate.getMonth());
+
+            if (monthsDiff > 4) {
+                e.preventDefault();
+                alert('Please select a date range of 4 months or less to avoid UI overload.');
+                return false;
+            }
+        });
+
+        // Add view mode change listener
+        document.querySelectorAll('input[name="view-mode"]').forEach(radio => {
+            radio.addEventListener('change', updateTimeSeriesChart);
+        });
+
+        // Generate mock data if needed for testing when the API is not available
+        document.getElementById('fetch-data').addEventListener('click', async (e) => {
+            e.preventDefault();
+
+            try {
+                await fetchClimateData();
+            } catch (error) {
+                console.warn('API fetch failed, generating mock data for testing:', error);
+                generateMockData();
+            }
+        });
+   
+
+        // Utility function to ensure a date string is in ISO format
+        function ensureISODateFormat(dateStr) {
+            // If it's already a proper date string, return it
+            if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                return dateStr;
+            }
+
+            // Try to parse and format the date
+            try {
+                const date = new Date(dateStr);
+                if (isNaN(date.getTime())) {
+                    throw new Error('Invalid date');
+                }
+                return formatDate(date);
+            } catch (e) {
+                console.error('Invalid date format:', dateStr);
+                return null;
+            }
+        }
+
+        // Generate mock data for testing
+        function generateMockData() {
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            const gridSize = parseInt(document.getElementById('grid-size').value);
+
+            console.log(`Generating mock data from ${startDate} to ${endDate} with grid size ${gridSize}`);
+
+            // Generate grid points
+            const points = [];
+            const latStep = (DEFAULT_MAX_LAT - DEFAULT_MIN_LAT) / (gridSize - 1);
+            const lonStep = (DEFAULT_MAX_LON - DEFAULT_MIN_LON) / (gridSize - 1);
+
+            for (let i = 0; i < gridSize; i++) {
+                for (let j = 0; j < gridSize; j++) {
+                    const lat = DEFAULT_MIN_LAT + i * latStep;
+                    const lon = DEFAULT_MIN_LON + j * lonStep;
+
+                    // Generate time series data
+                    const values = [];
+                    let currentDate = new Date(startDate);
+                    const endDateObj = new Date(endDate);
+
+                    while (currentDate <= endDateObj) {
+                        // Generate random precipitation with seasonal pattern
+                        // More rain in "summer" months (simulate seasonality)
+                        const month = currentDate.getMonth();
+                        const seasonalFactor = Math.sin((month / 12) * Math.PI * 2) * 10 + 10;
+                        const randomFactor = Math.random() * 10;
+                        const precipitation = Math.max(0, seasonalFactor + randomFactor - 5);
+
+                        values.push({
+                            date: formatDate(currentDate),
+                            year: currentDate.getFullYear(),
+                            month: currentDate.getMonth() + 1,
+                            day: currentDate.getDate(),
+                            values: {
+                                prec: precipitation
+                            }
+                        });
+
+                        // Move to next day
+                        currentDate.setDate(currentDate.getDate() + 1);
+                    }
+
+                    points.push({
+                        lat,
+                        lon,
+                        values
+                    });
+                }
+            }
+
+            console.log(`Generated ${points.length} points, each with ${points[0].values.length} time values`);
+
+            // Create average series
+            const dateMap = {};
+            points.forEach(point => {
+                point.values.forEach(timePoint => {
+                    const date = timePoint.date;
+                    if (!dateMap[date]) {
+                        dateMap[date] = {
+                            sum: 0,
+                            count: 0,
+                            date,
+                            year: timePoint.year,
+                            month: timePoint.month,
+                            day: timePoint.day
+                        };
+                    }
+                    dateMap[date].sum += timePoint.values.prec;
+                    dateMap[date].count++;
+                });
+            });
+
+            const average_series = Object.values(dateMap).map(item => ({
+                date: item.date,
+                year: item.year,
+                month: item.month,
+                day: item.day,
+                values: {
+                    prec: item.sum / item.count
+                }
+            })).sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            console.log(`Generated average series with ${average_series.length} entries`);
+
+            // Create monthly averages
+            const monthlyMap = {};
+            average_series.forEach(timePoint => {
+                const monthKey = `${timePoint.year}-${timePoint.month}`;
+                if (!monthlyMap[monthKey]) {
+                    monthlyMap[monthKey] = {
+                        sum: 0,
+                        count: 0,
+                        year: timePoint.year,
+                        month: timePoint.month
+                    };
+                }
+                monthlyMap[monthKey].sum += timePoint.values.prec;
+                monthlyMap[monthKey].count++;
+            });
+
+            const monthly_averages = Object.values(monthlyMap).map(item => ({
+                year: item.year,
+                month: item.month,
+                value: item.sum / item.count
+            })).sort((a, b) => {
+                if (a.year !== b.year) return a.year - b.year;
+                return a.month - b.month;
+            });
+
+            console.log(`Generated monthly averages with ${monthly_averages.length} entries`);
+
+            // Log some sample data for debugging
+            console.log("Sample point data:", points[0].values.slice(0, 3));
+            console.log("Sample average series:", average_series.slice(0, 3));
+            console.log("Sample monthly averages:", monthly_averages.slice(0, 3));
+
+            // Set mock data and update UI
+            climateData = {
+                bbox: [DEFAULT_MIN_LAT, DEFAULT_MIN_LON, DEFAULT_MAX_LAT, DEFAULT_MAX_LON],
+                data_source: 'chirps',
+                variable: 'prec',
+                grid_size: gridSize,
+                total_points: points.length,
+                points,
+                average_series,
+                monthly_averages,
+                start_date: startDate,
+                end_date: endDate,
+                cadence: 'daily'
+            };
+
+            updateMapMarkers();
+            updateMonthlyChart();
+            prepareHeatmapData();
+            updateHeatmap(0);
+            initializeTimelapseControls();
+            selectPoint(-1); // Select regional average by default
+        }
+    </script>
+</body>
+
+</html>
