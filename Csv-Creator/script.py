@@ -159,22 +159,22 @@ async def process_one_row(
     index,
     selected_set,
     cache,
-    semaphore
+    semaphore,
+    default_start_date=None,
+    default_end_date=None,
 ):
     async with semaphore:
         lat = row['latitude']
         lon = row['longitude']
 
-        start_date = construct_date(row, "start")
-        end_date = construct_date(row, "end")
+        start_date = construct_date(row, "start") or default_start_date
+        end_date = construct_date(row, "end") or default_end_date
 
         row_updates = {}
 
-        # GROUP selected variables by data source
         vars_by_source = group_selected_vars_by_source(selected_set)
 
         for source, variables in vars_by_source.items():
-            # Pass all variables for the source in a single call
             data = await query_climate_data(
                 lat, lon, start_date, end_date, source, variables, cache
             )
@@ -183,15 +183,12 @@ async def process_one_row(
 
             for entry in data['data']:
                 if source in STATIC_SOURCES:
-                    # Static: one value per variable
                     key = f"{source}_{entry['variable']}"
                     row_updates[key] = entry['value']
                 else:
-                    # Time series: values per date
                     date_str = entry.get("date") or f"{entry['year']}-{entry['month']:02d}"
                     for v, val in entry.get("values", {}).items():
                         key = f"{source}_{v}_{date_str}"
-                        # Convert ERA5 units if needed
                         if source == "era5" and v in {"sktemp", "sotemp1", "sotemp2", "sotemp3", "temp"}:
                             val = val - 273.15
                         if source == 'era5' and v in {"totprec"}:
@@ -200,6 +197,7 @@ async def process_one_row(
 
         return (index, row_updates)
 
+
 async def process_csv_file(
     input_csv_path,
     output_csv_path,
@@ -207,105 +205,72 @@ async def process_csv_file(
     default_end_date=None,
     cache_file_path="climate_data_cache.json",
     selected_set=None,
-    max_concurrent=150,
-    checkpoint_size=1000,      # <--- rows per output file
+    max_concurrent=100,
+    checkpoint_size=25,
     checkpoint_prefix="batches/results_batch_",
-    covariate_prefix="batches/covariates_batch"
-
+    zip_output_path="batches/"
 ):
     import math
     cache = load_cache(cache_file_path)
     df = pd.read_csv(input_csv_path)
-    results_df = df.copy()
     semaphore = asyncio.Semaphore(max_concurrent)
 
-    batch_updates = []
-    batch_indices = []
-    batch_number = 0
-
+    # Reset / create batch dir
     batch_dir = os.path.dirname(checkpoint_prefix)
     if os.path.exists(batch_dir):
         shutil.rmtree(batch_dir)
     os.makedirs(batch_dir, exist_ok=True)
 
-    tasks = [
-        process_one_row(
-            row,
-            idx,
-            selected_set,
-            cache,
-            semaphore
-        )
-        for idx, row in df.iterrows()
-    ]
+    n = len(df)
+    batch_number = 0
 
-    updates = []
-    for i, f in enumerate(tqdm(asyncio.as_completed(tasks), total=len(tasks), desc="Processing rows")):
-        result = await f
-        updates.append(result)
-        batch_updates.append(result)
-        batch_indices.append(result[0])
+    # Process in contiguous slices so file rows match original order
+    for start in range(0, n, checkpoint_size):
+        end = min(start + checkpoint_size, n)
 
-        # Every checkpoint_size rows, write a checkpoint CSV
-        if (i + 1) % checkpoint_size == 0:
-            indices = []
-            updates_dicts = []
-            for idx, row_updates in batch_updates:
-                indices.append(idx)
-                updates_dicts.append(row_updates)
-            updates_df = pd.DataFrame(updates_dicts, index=indices)
-            file_name = f"{checkpoint_prefix}{batch_number}.csv"
-            # Only output the batch
-            batch_df = pd.concat([results_df.iloc[indices], updates_df], axis=1)
-            batch_df = batch_df.copy()
-            batch_df.to_csv(file_name, index=False)
-            print(f"✅ Saved checkpoint {file_name} ({i+1} rows)")
+        # Build tasks for this slice in ORIGINAL order
+        tasks = [
+            process_one_row(
+                row=df.iloc[i],
+                index=i,
+                selected_set=selected_set,
+                cache=cache,
+                semaphore=semaphore,
+                default_start_date=default_start_date,
+                default_end_date=default_end_date,
+            )
+            for i in range(start, end)
+        ]
 
-            cov_file = file_name.replace("results_batch_", "covariates_batch_")
-            subprocess.run([
-                sys.executable, "../Csv-Creator/covariablesv3.py",
-                "--input", file_name,
-                "--output", cov_file
-            ], check=True)
+        # Gather preserves the order of 'tasks'
+        results = await asyncio.gather(*tasks, return_exceptions=False)
 
-            batch_updates = []
-            batch_indices = []
-            batch_number += 1
+        # Unpack to aligned index + dicts
+        indices = [idx for (idx, _upd) in results]
+        updates_dicts = [_upd for (_idx, _upd) in results]
 
-    # Write any remaining rows
-    if batch_updates:
-        indices = []
-        updates_dicts = []
-        for idx, row_updates in batch_updates:
-            indices.append(idx)
-            updates_dicts.append(row_updates)
+        # Create updates df aligned to original indices
         updates_df = pd.DataFrame(updates_dicts, index=indices)
+
+        # Concatenate with the exact original slice: preserves row order 1:1
+        base_slice = df.iloc[start:end]
+        batch_df = pd.concat([base_slice.reset_index(drop=True),
+                              updates_df.reindex(indices).reset_index(drop=True)],
+                             axis=1)
+
+        # Save batch file
         file_name = f"{checkpoint_prefix}{batch_number}.csv"
-        batch_df = pd.concat([results_df.iloc[indices], updates_df], axis=1)
-        batch_df = batch_df.copy()
         batch_df.to_csv(file_name, index=False)
-        print(f"✅ Saved checkpoint {file_name} (final batch)")
+        print(f"✅ Saved checkpoint {file_name} ({end - start} rows, rows {start}..{end-1})")
 
-        cov_file = file_name.replace("results_batch_", "covariates_batch_")
-        subprocess.run([
-            sys.executable, "../Csv-Creator/covariablesv3.py",
-            "--input", file_name,
-            "--output", cov_file
-        ], check=True)
+        # Persist cache incrementally (safer for long runs)
+        save_cache(cache, cache_file_path)
 
+        batch_number += 1
 
-    batch_pattern = f"{covariate_prefix}*.csv" if covariate_prefix.endswith('_') else f"{covariate_prefix}_*.csv"
-    batch_files = sorted(
-        glob.glob(batch_pattern),
-        key=lambda x: int(x.split('_')[-1].split('.')[0])
-    )
-    merged_df = pd.concat([pd.read_csv(f) for f in batch_files], ignore_index=True)
-    merged_df.to_csv(output_csv_path, index=False)
-    print(f"✅ Merged all covariate files to {output_csv_path}")
-
-    raw_batch_pattern = f"{checkpoint_prefix}*.csv"
-    zip_output = output_csv_path.replace("covariates_", "raw_data_").replace(".csv", "_batches.zip")
-    zip_batches(raw_batch_pattern, zip_output)
+    # Zip all batch CSVs
+    batch_pattern = f"{checkpoint_prefix}*.csv"
+    zip_batches(batch_pattern, output_csv_path)
 
 
 
