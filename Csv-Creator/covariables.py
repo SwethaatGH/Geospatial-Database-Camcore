@@ -612,7 +612,7 @@ def process_csv_file(input_csv_path, output_csv_path,
         save_cache(cache, cache_file_path)
     
     try:
-        results_df.to_csv(output_csv_path, index=False)
+        results_df.to_csv(output_csv_path, index=False,encoding="utf-8-sig")
         print(f"Results saved to {output_csv_path}")
         
         print(f"Cache now contains {len(cache)} entries")

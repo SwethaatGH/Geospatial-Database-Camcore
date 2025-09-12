@@ -177,7 +177,8 @@ async def process_csv(
         raise HTTPException(status_code=500, detail=f"Error saving file: {e}")
 
     raw_data_batches_zip = processed_dir / f"raw_data_{file.filename.replace('.csv', '_batches.zip')}"
-    covariates_path = processed_dir / f"covariates_{file.filename}"
+    base_filename=file.filename.replace('.csv','')
+    covariates_path = processed_dir / f"covariates_{base_filename}.zip"
 
     try:
         if option == "full":
@@ -204,11 +205,12 @@ async def process_csv(
             ], check=True)
 
         # Prepare response:
+        covariates_filename=f"covariates_{file.filename.replace('.csv','')}.zip"
         resp = {
             "message": "Processing complete.",
             "jobId": job_id,
             "rawDataFile": f"/download/{job_id}/{raw_data_batches_zip.name}",
-            "covariatesFile": f"/download/{job_id}/covariates_{file.filename}" if option == "full" else None
+            "covariatesFile": f"/download/{job_id}/{covariates_filename}" if option == "full" else None
         }
         return resp
 
