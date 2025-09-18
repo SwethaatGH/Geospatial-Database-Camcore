@@ -4,7 +4,7 @@ import time, json, argparse, hashlib, os
 import asyncio
 import sys
 import subprocess
-from tqdm import tqdm
+####from tqdm import tqdm
 from dateutil.parser import parse as try_parse_date
 from collections import defaultdict
 import glob
