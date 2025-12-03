@@ -181,6 +181,7 @@ async def process_one_row(
                 lat, lon, start_date, end_date, source, variables, cache, region
             )
             if not data or 'data' not in data:
+                print(f"⚠️ No data returned for {source} at ({lat}, {lon}): {data.get('error', 'Unknown error') if data else 'No response'}")
                 continue
 
             for entry in data['data']:
@@ -303,9 +304,13 @@ async def process_csv_file(
         glob.glob(batch_pattern),
         key=lambda x: int(x.split('_')[-1].split('.')[0])
     )
-    merged_df = pd.concat([pd.read_csv(f) for f in batch_files], ignore_index=True)
-    merged_df.to_csv(output_csv_path, index=False)
-    print(f"✅ Merged all covariate files to {output_csv_path}")
+    
+    if batch_files:
+        merged_df = pd.concat([pd.read_csv(f) for f in batch_files], ignore_index=True)
+        merged_df.to_csv(output_csv_path, index=False)
+        print(f"✅ Merged all covariate files to {output_csv_path}")
+    else:
+        print(f"⚠️ No covariate batch files found. Skipping merge.")
 
     raw_batch_pattern = f"{checkpoint_prefix}*.csv"
     zip_output = output_csv_path.replace("covariates_", "raw_data_").replace(".csv", "_batches.zip")
