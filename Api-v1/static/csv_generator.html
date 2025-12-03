@@ -922,8 +922,8 @@
             
             // Process form data by creating a CSV file
             function processFormData(lat, lon, startDate, endDate, option) {
-                // Create CSV content
-                const csvContent = `lat,lon,start_date,end_date\n${lat},${lon},${startDate},${endDate}`;
+                // Create CSV content with correct column names
+                const csvContent = `latitude,longitude,start_date,end_date\n${lat},${lon},${startDate},${endDate}`;
                 const blob = new Blob([csvContent], { type: 'text/csv' });
                 const file = new File([blob], 'single_location.csv', { type: 'text/csv' });
                 
