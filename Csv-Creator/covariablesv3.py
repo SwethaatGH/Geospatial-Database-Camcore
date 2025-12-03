@@ -823,6 +823,10 @@ def main():
         print(f"Failed to load input CSV: {e}")
         return
     
+    # Check if 'id' column exists, if not create it
+    if 'id' not in df.columns:
+        df['id'] = range(len(df))
+    
         # --- Extract static elev_ and soil_ columns ---
     static_cols = ['id', 'latitude', 'longitude'] + [col for col in df.columns if col.startswith("elev_") or col.startswith("soil_") or col.startswith("bio_") or col.startswith("koppen_")]
     static_df = df[static_cols].drop_duplicates(subset=["id", "latitude", "longitude"])
