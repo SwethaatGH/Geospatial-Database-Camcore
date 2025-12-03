@@ -29,7 +29,7 @@ if api_v1_path not in sys.path:
     sys.path.insert(0, api_v1_path)
 
 from app.database import get_db
-from app.main import DataSource
+from app.main import DataSource, Region
 from app.climate_data_service import get_climate_data_timeseries_logic
 
 def convert_date_format(date_str):
@@ -105,23 +105,24 @@ def load_cache(cache_file_path):
     except:
         return {}
 
-async def query_climate_data(lat, lon, start_date, end_date, data_source, variable=None, cache=None):
+async def query_climate_data(lat, lon, start_date, end_date, data_source, variable=None, cache=None, region="brazil"):
 
     variable_key = (
         ','.join(variable) if isinstance(variable, list) else str(variable)
         if variable is not None else "None"
     )
 
-    cache_key = f"{lat}_{lon}_{start_date}_{end_date}_{data_source}_{variable_key}"
+    cache_key = f"{lat}_{lon}_{start_date}_{end_date}_{data_source}_{variable_key}_{region}"
     cache_hash = hashlib.md5(cache_key.encode()).hexdigest()
     if cache and cache_hash in cache:
         return cache[cache_hash]
 
-    db_gen = get_db()
+    db_gen = get_db(region=region)
     db = await db_gen.__anext__()
     try:
         result = await get_climate_data_timeseries_logic(
             lat=lat, lon=lon,
+            region=region,
             start_date=start_date, end_date=end_date,
             data_source=DataSource(data_source),
             variable=variable,
@@ -161,7 +162,8 @@ async def process_one_row(
     index,
     selected_set,
     cache,
-    semaphore
+    semaphore,
+    region
 ):
     async with semaphore:
         lat = row['latitude']
@@ -178,7 +180,7 @@ async def process_one_row(
         for source, variables in vars_by_source.items():
             # Pass all variables for the source in a single call
             data = await query_climate_data(
-                lat, lon, start_date, end_date, source, variables, cache
+                lat, lon, start_date, end_date, source, variables, cache, region
             )
             if not data or 'data' not in data:
                 continue
@@ -209,6 +211,7 @@ async def process_csv_file(
     default_end_date=None,
     cache_file_path="climate_data_cache.json",
     selected_set=None,
+    region="brazil",
     max_concurrent=100,
     checkpoint_size=1000,      # <--- rows per output file
     checkpoint_prefix="batches/results_batch_",
@@ -235,7 +238,8 @@ async def process_csv_file(
             idx,
             selected_set,
             cache,
-            semaphore
+            semaphore,
+            region
         )
         for idx, row in df.iterrows()
     ]
@@ -292,6 +296,7 @@ async def main():
     parser.add_argument('--default-end-date', default="2000-12-31")
     parser.add_argument('--cache-file', default="climate_data_cache.json")
     parser.add_argument('--vars', default="[]")
+    parser.add_argument('--region', default="brazil")
     args = parser.parse_args()
 
     selected_pairs = json.loads(args.vars)
@@ -303,7 +308,8 @@ async def main():
         default_start_date=args.default_start_date,
         default_end_date=args.default_end_date,
         cache_file_path=args.cache_file,
-        selected_set=selected_set
+        selected_set=selected_set,
+        region=args.region
     )
 
 if __name__ == "__main__":
