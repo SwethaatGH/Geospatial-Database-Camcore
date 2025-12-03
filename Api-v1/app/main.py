@@ -18,6 +18,10 @@ from shapely.geometry import box
 from shapely import wkt as shapely_wkt
 
 # --- Enums and configs ---
+class Region(str, Enum):
+    BRAZIL = "brazil"
+    INDONESIA = "indonesia"
+
 class DataSource(str, Enum):
     WORLDCLIM = "wc"
     SPEI = "spei"
@@ -149,6 +153,7 @@ async def root():
 async def get_climate_data_timeseries(
     lat: float = Query(...),
     lon: float = Query(...),
+    region: Region = Query(Region.BRAZIL, description="Geographic region (brazil or indonesia)"),
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
     variable: Optional[str] = Query(None),
@@ -157,6 +162,7 @@ async def get_climate_data_timeseries(
 ):
     return await get_climate_data_timeseries_logic(
         lat=lat, lon=lon,
+        region=region,
         start_date=start_date, end_date=end_date,
         data_source=data_source, variable=variable,
         db=db
@@ -794,5 +800,5 @@ async def get_climate_data_grid_heatmap(
     
 @app.get("/CSVGenerator", response_class=HTMLResponse)
 async def get_csv_generator():
-    with open("static/csv_generator.html", "r") as f:
+    with open("static/csv_generator.html", "r", encoding="utf-8") as f:
         return f.read()
