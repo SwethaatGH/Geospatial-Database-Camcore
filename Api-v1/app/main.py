@@ -5,7 +5,7 @@ import sys
 import os, shutil, subprocess, uuid, json
 from pathlib import Path
 from typing import Optional, List, Dict, Any
-from fastapi import FastAPI, Depends, HTTPException, Query, File, UploadFile, Form, Header
+from fastapi import FastAPI, Depends, HTTPException, Query, File, UploadFile, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -128,14 +128,6 @@ from app.climate_data_service import get_climate_data_timeseries_logic, table_ex
 # --- App init ---
 app = FastAPI(title="Camcore Database API")
 
-# Authentication configuration
-API_SECRET_KEY = "camcore_geospatial_database_api_access"
-
-async def verify_api_key(x_api_key: Optional[str] = Header(None)):
-    if x_api_key != API_SECRET_KEY:
-        raise HTTPException(status_code=401, detail="Invalid API key")
-    return x_api_key
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -169,8 +161,8 @@ async def get_climate_data_timeseries(
     )
 ## Most used functions above, new endpoints below ##
 
-# CSV Processor Endpoint - NOW WITH AUTHENTICATION
-@app.post("/api/process-csv", dependencies=[Depends(verify_api_key)])
+# CSV Processor Endpoint
+@app.post("/api/process-csv")
 async def process_csv(
     file: UploadFile = File(...),
     option: str = Form(...),
@@ -229,7 +221,7 @@ async def process_csv(
         raise HTTPException(status_code=500, detail=f"Processing error: {e}")
 
 
-@app.get("/download/{job_id}/{filename}", dependencies=[Depends(verify_api_key)])
+@app.get("/download/{job_id}/{filename}")
 async def download_file(job_id: str, filename: str):
     file_path = Path(f"../Csv-Creator/processed/{job_id}/{filename}")
     if not file_path.exists():
