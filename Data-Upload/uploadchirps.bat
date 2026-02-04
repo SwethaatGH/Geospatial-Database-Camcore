@@ -1,14 +1,20 @@
 @echo off
 
+REM Set the data directory (UPDATE THIS PATH!)
+set DATA_DIR=C:\path\to\Indonesia_CHIRPS_Resampled
+
 REM Set environment variables
-set DB_USER=XXXX
-set DB_PASS=XXXX
+set DB_USER=postgres
+set DB_PASS=postgres
 set DB_HOST=localhost
-set DB_PORT=5432
-set DB_NAME=covariablesv1
+set DB_PORT=5433
+set DB_NAME=covariables_indonesia
 
 REM Set the password for PostgreSQL using PGPASSWORD
 set PGPASSWORD=%DB_PASS%
+
+REM Change to data directory
+cd /d %DATA_DIR%
 
 for %%f in (*.tif) do (
     set "name=%%~nf"

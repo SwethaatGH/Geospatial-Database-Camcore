@@ -1,11 +1,11 @@
 @echo off
 
 REM Set environment variables
-set DB_USER=XXXX
-set DB_PASS=XXXX
+set DB_USER=postgres
+set DB_PASS=Camcore22
 set DB_HOST=localhost
-set DB_PORT=5432
-set DB_NAME=covariablesv1
+set DB_PORT=5433
+set DB_NAME=covariables_indonesia
 
 REM Set the password for PostgreSQL using PGPASSWORD
 set PGPASSWORD=%DB_PASS%

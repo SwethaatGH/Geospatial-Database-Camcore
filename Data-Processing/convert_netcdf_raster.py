@@ -37,8 +37,8 @@ GDAL_BIN = r"C:\Program Files\QGIS 3.40.4\bin"
 gdal_translate = os.path.join(GDAL_BIN, "gdal_translate.exe")
 
 # Set input and output directories
-DATA_DIR = r"ReplaceWithYourNASAPowerNETCDFDirectory"
-OUTPUT_BASE_DIR = "output_rasters"
+DATA_DIR = r"Q:\My Drive\Indonesia_NASA_POWER_Daily"
+OUTPUT_BASE_DIR = r"Q:\My Drive\Indonesia_NASA_POWER_Monthly"
 
 # Target resolution in degrees (can be removed if you want to keep original resolution)
 TARGET_RES = 0.02

@@ -2,16 +2,18 @@
 @echo off
 setlocal enabledelayedexpansion
 rem Define input and output directories
-set "INPUT_DIR=ReplaceWithYourPath\CHIRPS_BBOX"
-set "OUTPUT_DIR=ReplaceWithYourPath\CHIRPS_BBOX_resampled"
+rem Updated for Indonesia CHIRPS daily files (format: CHIRPS_YYYY-MM-DD.tif)
+set "INPUT_DIR=ReplaceWithYourPath\Indonesia_CHIRPS_Daily"
+set "OUTPUT_DIR=ReplaceWithYourPath\Indonesia_CHIRPS_Daily_resampled"
 rem Create output directory if it doesn't exist
 if not exist "%OUTPUT_DIR%" mkdir "%OUTPUT_DIR%"
 rem Iterate through all .tif files in the input directory
-for %%f in ("%INPUT_DIR%\*.tif") do (
-    rem Extract the filename (e.g., Precip_2013-07-26.tif)
+for %%f in ("%INPUT_DIR%\CHIRPS_*.tif") do (
+    rem Extract the filename (e.g., CHIRPS_2013-07-26.tif)
     set "FILENAME=%%~nxf"
     
     rem Extract the date part from the filename (e.g., 2013-07-26)
+    rem For CHIRPS_YYYY-MM-DD.tif format
     for /f "tokens=2 delims=_." %%a in ("!FILENAME!") do (
         set "DATE=%%a"
     )

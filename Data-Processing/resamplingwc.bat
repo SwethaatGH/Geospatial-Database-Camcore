@@ -2,8 +2,8 @@
 setlocal enabledelayedexpansion
 
 rem Define input and output directories
-set "INPUT_DIR=ReplaceWitYourPath\WorldClim\2.5mins"
-set "OUTPUT_DIR=ReplaceWitYourPath\WorldClimResamp0.02"
+set "INPUT_DIR=Q:\My Drive\Indonesia_WorldClim_2.5m"
+set "OUTPUT_DIR=C:\Users\rcavalh\Documents\Indonesia_WorldClim_Resampled"
 
 rem Create output directory if it doesn't exist
 if not exist "%OUTPUT_DIR%" mkdir "%OUTPUT_DIR%"
