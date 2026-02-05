@@ -1,4 +1,4 @@
-# main.py (fully integrated version with authentication)
+""# main.py (fully integrated version)
 import time
 import math
 import sys
@@ -18,10 +18,6 @@ from shapely.geometry import box
 from shapely import wkt as shapely_wkt
 
 # --- Enums and configs ---
-class Region(str, Enum):
-    BRAZIL = "brazil"
-    INDONESIA = "indonesia"
-
 class DataSource(str, Enum):
     WORLDCLIM = "wc"
     SPEI = "spei"
@@ -56,6 +52,7 @@ DATA_SOURCE_CADENCE = {
     DataSource.KOPPEN: Cadence.STATIC,
     DataSource.BIOCLIM: Cadence.STATIC,
     DataSource.BRAZIL: Cadence.DAILY,
+    
 }
 
 DATA_SOURCE_TABLES = {
@@ -91,7 +88,7 @@ AVAILABLE_VARIABLES = {
                          "original_allsky_sfc_sw_diff", "original_allsky_sfc_sw_dirh", "psh", "pw", "srf_alb_adj", "toa_sw_dni", 
                          "toa_sw_dwn", "ts_adj"],
     DataSource.ERA5: ["evaptrans", "latheat", "netsolrad", "press", "sktemp", "sotemp1", "sotemp2", "sotemp3", "temp", 
-                     "totprec", "uwind", "vwind", "volsowat1", "volsowat2", "volsowat3"],
+                     "totprec", "uwind", "vwind", "volsowat1", "volsowat12", "volsowat13"],
     DataSource.BIOCLIM: [
         "bio1", "bio2", "bio3", "bio4", "bio5",
         "bio6", "bio7", "bio8", "bio9", "bio10",
@@ -145,7 +142,6 @@ async def root():
 async def get_climate_data_timeseries(
     lat: float = Query(...),
     lon: float = Query(...),
-    region: Region = Query(Region.BRAZIL, description="Geographic region (brazil or indonesia)"),
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
     variable: Optional[str] = Query(None),
@@ -154,7 +150,6 @@ async def get_climate_data_timeseries(
 ):
     return await get_climate_data_timeseries_logic(
         lat=lat, lon=lon,
-        region=region,
         start_date=start_date, end_date=end_date,
         data_source=data_source, variable=variable,
         db=db
@@ -167,7 +162,6 @@ async def process_csv(
     file: UploadFile = File(...),
     option: str = Form(...),
     variables: Optional[str] = Form(None),
-    region: str = Form("brazil"),
 ):
     job_id = str(uuid.uuid4())
     upload_dir = Path(f"../Csv-Creator/uploads/{job_id}")
@@ -195,8 +189,7 @@ async def process_csv(
                 "--default-start-date", "2000-01-01",
                 "--default-end-date", "2000-12-31",
                 "--cache-file", f"{processed_dir}/cache.json",
-                "--vars", variables,
-                "--region", region
+                "--vars", variables 
             ], check=True)
         else:
             # Run script_raw.py (which does batching and merging, but not covariates)
@@ -207,8 +200,7 @@ async def process_csv(
                 "--default-start-date", "2000-01-01",
                 "--default-end-date", "2000-12-31",
                 "--cache-file", f"{processed_dir}/cache.json",
-                "--vars", variables,
-                "--region", region
+                "--vars", variables 
             ], check=True)
 
         # Prepare response:
@@ -795,5 +787,6 @@ async def get_climate_data_grid_heatmap(
     
 @app.get("/CSVGenerator", response_class=HTMLResponse)
 async def get_csv_generator():
-    with open("static/csv_generator.html", "r", encoding="utf-8") as f:
+    with open("static/csv_generator.html", "r") as f:
         return f.read()
+    

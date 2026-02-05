@@ -3,124 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CSV Generator - Multi-Region Climate Data</title>
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>CSV Generator</title>
     <style>
-        :root {
-            --primary-color: #2563eb;
-            --primary-hover: #1d4ed8;
-            --success-color: #10b981;
-            --danger-color: #ef4444;
-            --warning-color: #f59e0b;
-            --bg-light: #f8fafc;
-            --bg-white: #ffffff;
-            --text-primary: #1e293b;
-            --text-secondary: #64748b;
-            --border-color: #e2e8f0;
-            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            max-width: 900px;
+            font-family: Arial, sans-serif;
+            max-width: 800px;
             margin: 0 auto;
             padding: 20px;
             line-height: 1.6;
-            background: var(--bg-light);
-            color: var(--text-primary);
         }
         
         h1 {
             text-align: center;
-            color: var(--text-primary);
-            font-weight: 700;
-            font-size: 28px;
-            margin-bottom: 10px;
-        }
-
-        .subtitle {
-            text-align: center;
-            color: var(--text-secondary);
-            font-size: 14px;
-            margin-bottom: 30px;
-        }
-
-        .region-selector {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .region-selector label {
-            font-weight: 600;
-            margin-right: 10px;
-            color: var(--text-primary);
-        }
-
-        .region-selector select {
-            padding: 8px 16px;
-            border: 2px solid var(--primary-color);
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 500;
-            color: var(--primary-color);
-            background: white;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .region-selector select:hover {
-            background: var(--bg-light);
-        }
-
-        .region-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            background: var(--primary-color);
-            color: white;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-            margin-left: 10px;
+            color: #333;
         }
         
         .container {
-            background: var(--bg-white);
-            border: 1px solid var(--border-color);
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: var(--shadow-md);
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
         .upload-area {
-            border: 3px dashed var(--border-color);
-            padding: 40px;
+            border: 2px dashed #ccc;
+            padding: 25px;
             text-align: center;
             margin: 20px 0;
-            border-radius: 12px;
+            border-radius: 5px;
             cursor: pointer;
-            transition: all 0.3s;
-            background: var(--bg-light);
+            transition: background-color 0.3s;
         }
         
         .upload-area:hover {
-            background-color: #e0f2fe;
-            border-color: var(--primary-color);
-        }
-
-        .upload-area p {
-            color: var(--text-secondary);
-            font-size: 16px;
-            margin: 0;
+            background-color: #f8f8f8;
         }
         
         .hidden {
@@ -145,32 +61,23 @@
         }
         
         button {
-            background: var(--primary-color);
+            background-color: #4CAF50;
             color: white;
-            padding: 12px 24px;
+            padding: 10px 15px;
             border: none;
-            border-radius: 8px;
+            border-radius: 4px;
             cursor: pointer;
-            font-size: 15px;
-            font-weight: 600;
-            transition: all 0.2s;
-            box-shadow: var(--shadow-sm);
+            font-size: 16px;
+            transition: background-color 0.3s;
         }
         
         button:hover {
-            background: var(--primary-hover);
-            transform: translateY(-1px);
-            box-shadow: var(--shadow-md);
-        }
-
-        button:active {
-            transform: translateY(0);
+            background-color: #45a049;
         }
         
         button:disabled {
-            background-color: #cbd5e1;
+            background-color: #cccccc;
             cursor: not-allowed;
-            transform: none;
         }
         
         .loading {
@@ -217,301 +124,48 @@
         }
         
         .info-box {
-            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
-            border-left: 4px solid var(--primary-color);
-            padding: 20px;
-            margin: 20px 0;
-            border-radius: 8px;
-        }
-
-        .info-box p {
-            margin: 0 0 10px 0;
-            font-weight: 500;
-        }
-
-        .info-box ul {
-            margin: 10px 0 0 20px;
+            background-color: #e7f3fe;
+            border-left: 5px solid #2196F3;
+            padding: 10px;
+            margin: 15px 0;
         }
 
         #checkbox-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-            gap: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
         }
 
         .source-group {
-            background-color: var(--bg-white);
-            border: 2px solid var(--border-color);
-            border-radius: 10px;
-            overflow: hidden;
-            transition: all 0.2s;
-        }
-
-        .source-group:hover {
-            box-shadow: var(--shadow-md);
-            border-color: var(--primary-color);
-        }
-
-        .source-header {
-            background: linear-gradient(135deg, #475569 0%, #64748b 100%);
-            color: white;
-            padding: 12px 15px;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-weight: 600;
-            user-select: none;
-        }
-
-        .source-header:hover {
-            background: linear-gradient(135deg, #334155 0%, #475569 100%);
-        }
-
-        .source-count {
-            background: rgba(255, 255, 255, 0.2);
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-
-        .source-variables {
-            padding: 15px;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .variable-item {
-            margin: 8px 0;
-            padding: 6px;
+            flex: 1 1 300px; /* Responsive width */
+            min-width: 280px;
+            max-width: 350px;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            padding: 12px;
             border-radius: 6px;
-            transition: background 0.2s;
-        }
-
-        .variable-item:hover {
-            background: var(--bg-light);
-        }
-
-        .variable-item label {
-            display: flex;
-            align-items: center;
-            cursor: pointer;
-            margin: 0;
-        }
-
-        .variable-item input[type="checkbox"] {
-            margin-right: 10px;
-            cursor: pointer;
-            width: 16px;
-            height: 16px;
-        }
-
-        .search-box {
-            margin-bottom: 20px;
-            position: relative;
-        }
-
-        .search-box input {
-            width: 100%;
-            padding: 12px 40px 12px 16px;
-            border: 2px solid var(--border-color);
-            border-radius: 8px;
-            font-size: 14px;
-            transition: all 0.2s;
-        }
-
-        .search-box input:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-        }
-
-        .search-icon {
-            position: absolute;
-            right: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-secondary);
-        }
-
-        .control-buttons {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-
-        .control-buttons button {
-            flex: 1;
-            min-width: 140px;
-            padding: 10px 16px;
-            font-size: 13px;
-        }
-
-
-
-        .master-checkbox-label {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin: 0;
-        }
-
-        .input-mode-toggle {
-            display: flex;
-            justify-content: center;
-            gap: 0;
-            margin-bottom: 30px;
-            background: var(--bg-light);
-            padding: 4px;
-            border-radius: 10px;
-            border: 2px solid var(--border-color);
-        }
-
-        .mode-btn {
-            flex: 1;
-            padding: 12px 24px;
-            background: transparent;
-            color: var(--text-secondary);
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            box-shadow: none;
-        }
-
-        .mode-btn:hover {
-            transform: none;
-            background: rgba(37, 99, 235, 0.1);
-            color: var(--primary-color);
-        }
-
-        .mode-btn.active {
-            background: var(--primary-color);
-            color: white;
-            box-shadow: var(--shadow-sm);
-        }
-
-        .single-location-form {
-            background: var(--bg-white);
-            border: 2px solid var(--border-color);
-            padding: 25px;
-            border-radius: 12px;
-            margin: 20px 0;
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 15px;
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .form-group label {
-            font-weight: 600;
-            margin-bottom: 6px;
-            color: var(--text-primary);
-            font-size: 14px;
-        }
-
-        .form-group input {
-            padding: 10px 12px;
-            border: 2px solid var(--border-color);
-            border-radius: 8px;
-            font-size: 14px;
-            transition: all 0.2s;
-        }
-
-        .form-group input:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-        }
-
-        .form-group small {
-            color: var(--text-secondary);
-            margin-top: 4px;
-            font-size: 12px;
         }
 
     </style>
 </head>
 <body>
-    <h1>🌍 CSV Generator Tool</h1>
-    <p class="subtitle">Generate climate data CSVs</p>
+    <h1>CSV Generator Tool</h1>
     
-    <div class="region-selector">
-        <label for="region-select">📍 Select Region:</label>
-        <select id="region-select">
-            <option value="brazil" selected>Brazil</option>
-            <option value="indonesia">Indonesia</option>
-        </select>
-        <span class="region-badge" id="region-badge">BRAZIL</span>
-    </div>
-
-    <div class="input-mode-toggle">
-        <button class="mode-btn active" id="csv-mode-btn" type="button">📁 Upload CSV File</button>
-        <button class="mode-btn" id="form-mode-btn" type="button">📝 Single Location Form</button>
-    </div>
-
     <div class="container">
-        <!-- CSV Upload Mode -->
-        <div id="csv-upload-mode">
-            <div class="info-box">
-                <p>📄 Please upload a CSV or XLSX file containing columns for:</p>
-                <ul>
-                    <li><strong>Latitude</strong> (lat)</li>
-                    <li><strong>Longitude</strong> (lon)</li>
-                    <li><strong>Start date</strong> (YYYY-MM-DD)</li>
-                    <li><strong>End date</strong> (YYYY-MM-DD)</li>
-                </ul>
-                <p style="margin-top: 10px;"><em>Upload multiple rows for batch processing multiple locations.</em></p>
-            </div>
-            
-            <div class="upload-area" id="upload-area">
-                <p>Drag and drop your file here or click to select</p>
-                <input type="file" id="file-input" accept=".csv,.xlsx" class="hidden">
-                <div id="file-name"></div>
-            </div>
+        <div class="info-box">
+            <p>Please upload a CSV or XLSX file containing columns for:</p>
+            <ul>
+                <li>Latitude (lat)</li>
+                <li>Longitude (lon)</li>
+                <li>Start date</li>
+                <li>End date</li>
+            </ul>
         </div>
-
-        <!-- Single Location Form Mode -->
-        <div id="form-input-mode" class="hidden">
-            <div class="info-box">
-                <p>📍 Enter coordinates and date range for a single location query</p>
-            </div>
-            
-            <div class="single-location-form">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="form-lat">Latitude *</label>
-                        <input type="number" id="form-lat" step="0.000001" placeholder="-23.550520" required>
-                        <small>Decimal degrees (-90 to 90)</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="form-lon">Longitude *</label>
-                        <input type="number" id="form-lon" step="0.000001" placeholder="-46.633308" required>
-                        <small>Decimal degrees (-180 to 180)</small>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="form-start-date">Start Date *</label>
-                        <input type="date" id="form-start-date" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="form-end-date">End Date *</label>
-                        <input type="date" id="form-end-date" required>
-                    </div>
-                </div>
-            </div>
+        
+        <div class="upload-area" id="upload-area">
+            <p>Drag and drop your file here or click to select</p>
+            <input type="file" id="file-input" accept=".csv,.xlsx" class="hidden">
+            <div id="file-name"></div>
         </div>
         
         <div id="error-message" class="error hidden"></div>
@@ -521,18 +175,15 @@
             <p>What would you like to generate?</p>
 
             <div id="data-source-checkboxes">
+
+                <button id="toggle-checkboxes-btn" type="button" style="margin-bottom: 10px;">
+                Unselect All
+                </button>
+
                 <h4>Select Data Sources and Variables:</h4>
-                
-                <div class="search-box">
-                    <input type="text" id="variable-search" placeholder="Search variables...">
-                    <span class="search-icon">🔍</span>
-                </div>
-
-                <div class="control-buttons">
-                    <button id="toggle-checkboxes-btn" type="button">Unselect All</button>
-                </div>
-
                 <div id="checkbox-container"></div>
+
+                
             </div>
             
             <label>
@@ -571,88 +222,17 @@
             const loadingSection = document.getElementById('loading-section');
             const resultsSection = document.getElementById('results-section');
             const downloadButtons = document.getElementById('download-buttons');
-            const regionSelect = document.getElementById('region-select');
-            const regionBadge = document.getElementById('region-badge');
-            
-            // Input mode elements
-            const csvModeBtn = document.getElementById('csv-mode-btn');
-            const formModeBtn = document.getElementById('form-mode-btn');
-            const csvUploadMode = document.getElementById('csv-upload-mode');
-            const formInputMode = document.getElementById('form-input-mode');
-            let currentMode = 'csv'; // 'csv' or 'form'
             
             let uploadedFile = null;
 
-            // Handle region change
-            regionSelect.addEventListener('change', function() {
-                const region = this.value.toUpperCase();
-                regionBadge.textContent = region;
-            });
-
-            // Handle input mode toggle
-            csvModeBtn.addEventListener('click', function() {
-                currentMode = 'csv';
-                csvModeBtn.classList.add('active');
-                formModeBtn.classList.remove('active');
-                csvUploadMode.classList.remove('hidden');
-                formInputMode.classList.add('hidden');
-                optionsSection.classList.add('hidden');
-                errorMessage.classList.add('hidden');
-            });
-
-            formModeBtn.addEventListener('click', function() {
-                currentMode = 'form';
-                formModeBtn.classList.add('active');
-                csvModeBtn.classList.remove('active');
-                formInputMode.classList.remove('hidden');
-                csvUploadMode.classList.add('hidden');
-                optionsSection.classList.remove('hidden');
-                errorMessage.classList.add('hidden');
-            });
-
             const toggleButton = document.getElementById('toggle-checkboxes-btn');
-            const searchInput = document.getElementById('variable-search');
-            let allChecked = true;
+            let allChecked = true;  // start with everything checked by default
 
-            // Toggle all checkboxes
             toggleButton.addEventListener('click', () => {
                 const checkboxes = document.querySelectorAll('input.variable-checkbox, input.master-checkbox');
                 checkboxes.forEach(cb => cb.checked = !allChecked);
                 allChecked = !allChecked;
                 toggleButton.textContent = allChecked ? "Unselect All" : "Select All";
-            });
-
-            // Search functionality
-            searchInput.addEventListener('input', (e) => {
-                const searchTerm = e.target.value.toLowerCase();
-                const groups = document.querySelectorAll('.source-group');
-                
-                groups.forEach(group => {
-                    const variables = group.querySelectorAll('.variable-item');
-                    let hasVisibleVar = false;
-                    
-                    variables.forEach(varItem => {
-                        const label = varItem.dataset.label;
-                        const variable = varItem.dataset.variable;
-                        const matches = label.includes(searchTerm) || variable.includes(searchTerm);
-                        
-                        if (matches) {
-                            varItem.style.display = '';
-                            hasVisibleVar = true;
-                        } else {
-                            varItem.style.display = 'none';
-                        }
-                    });
-                    
-                    // Show/hide entire group based on matches
-                    if (searchTerm && hasVisibleVar) {
-                        group.style.display = '';
-                    } else if (searchTerm && !hasVisibleVar) {
-                        group.style.display = 'none';
-                    } else {
-                        group.style.display = '';
-                    }
-                });
             });
             
             const checkboxContainer = document.getElementById('checkbox-container');
@@ -760,80 +340,42 @@
             for (const source in dataSources) {
                 const group = document.createElement('div');
                 group.className = 'source-group';
-                group.dataset.source = source;
                 
-                // Create header
-                const header = document.createElement('div');
-                header.className = 'source-header';
-                
-                const headerLeft = document.createElement('div');
-                headerLeft.style.display = 'flex';
-                headerLeft.style.alignItems = 'center';
-                headerLeft.style.gap = '10px';
-                
+                const sourceLabel = document.createElement('label');
                 const sourceCheckbox = document.createElement('input');
                 sourceCheckbox.type = 'checkbox';
                 sourceCheckbox.checked = true;
+                sourceCheckbox.style.marginRight = '6px';
                 sourceCheckbox.className = 'master-checkbox';
-                sourceCheckbox.onclick = (e) => e.stopPropagation();
-                
+
                 const displayName = dataSourceLabels[source] || source;
-                const headerText = document.createElement('span');
-                headerText.textContent = displayName;
-                
-                headerLeft.appendChild(sourceCheckbox);
-                headerLeft.appendChild(headerText);
-                
-                const headerRight = document.createElement('div');
-                headerRight.style.display = 'flex';
-                headerRight.style.alignItems = 'center';
-                headerRight.style.gap = '10px';
-                
-                const count = document.createElement('span');
-                count.className = 'source-count';
-                count.textContent = `${dataSources[source].length} vars`;
-                
-                headerRight.appendChild(count);
-                
-                header.appendChild(headerLeft);
-                header.appendChild(headerRight);
-                
-                // Create variables container
-                const variablesContainer = document.createElement('div');
-                variablesContainer.className = 'source-variables';
-                
-                // Handle master checkbox
+                sourceLabel.appendChild(sourceCheckbox);
+                sourceLabel.append(document.createTextNode(` ${displayName}:`));
+                group.appendChild(sourceLabel);
+
                 sourceCheckbox.addEventListener('change', () => {
-                    const checkboxes = variablesContainer.querySelectorAll('input.variable-checkbox');
+                    const checkboxes = group.querySelectorAll('input.variable-checkbox');
                     checkboxes.forEach(cb => cb.checked = sourceCheckbox.checked);
                 });
-                
-                // Create variable checkboxes
+
                 dataSources[source].forEach(variable => {
-                    const varItem = document.createElement('div');
-                    varItem.className = 'variable-item';
-                    varItem.dataset.variable = variable;
-                    varItem.dataset.label = (variableLabels[variable] || variable).toLowerCase();
-                    
                     const checkbox = document.createElement('input');
                     checkbox.type = 'checkbox';
                     checkbox.name = 'variable-checkbox';
                     checkbox.value = `${source}:${variable}`;
                     checkbox.checked = true;
                     checkbox.className = 'variable-checkbox';
-                    checkbox.id = `var-${source}-${variable}`;
-                    
+
                     const label = document.createElement('label');
-                    label.htmlFor = `var-${source}-${variable}`;
+                    label.style.marginLeft = '10px';
+                    label.style.display = 'inline-block';
                     label.appendChild(checkbox);
-                    label.appendChild(document.createTextNode(variableLabels[variable] || variable));
-                    
-                    varItem.appendChild(label);
-                    variablesContainer.appendChild(varItem);
+                    label.append(` ${variableLabels[variable] || variable}`);
+
+                    group.appendChild(document.createElement('br'));
+                    group.appendChild(label);
                 });
-                
-                group.appendChild(header);
-                group.appendChild(variablesContainer);
+
                 checkboxContainer.appendChild(group);
             }
 
@@ -886,50 +428,15 @@
             
             // Handle process button click
             processBtn.addEventListener('click', function() {
-                if (currentMode === 'csv') {
-                    if (!uploadedFile) {
-                        showError('Please select a file first.');
-                        return;
-                    }
-                    const processOption = document.querySelector('input[name="process-option"]:checked').value;
-                    processFile(uploadedFile, processOption);
-                } else {
-                    // Form mode - validate and create virtual file
-                    const lat = document.getElementById('form-lat').value;
-                    const lon = document.getElementById('form-lon').value;
-                    const startDate = document.getElementById('form-start-date').value;
-                    const endDate = document.getElementById('form-end-date').value;
-                    
-                    if (!lat || !lon || !startDate || !endDate) {
-                        showError('Please fill in all required fields.');
-                        return;
-                    }
-                    
-                    // Validate ranges
-                    if (lat < -90 || lat > 90) {
-                        showError('Latitude must be between -90 and 90.');
-                        return;
-                    }
-                    if (lon < -180 || lon > 180) {
-                        showError('Longitude must be between -180 and 180.');
-                        return;
-                    }
-                    
-                    const processOption = document.querySelector('input[name="process-option"]:checked').value;
-                    processFormData(lat, lon, startDate, endDate, processOption);
+                if (!uploadedFile) {
+                    showError('Please select a file first.');
+                    return;
                 }
+                
+                const processOption = document.querySelector('input[name="process-option"]:checked').value;
+                processFile(uploadedFile, processOption);
             });
             
-            // Process form data by creating a CSV file
-            function processFormData(lat, lon, startDate, endDate, option) {
-                // Create CSV content with correct column names
-                const csvContent = `latitude,longitude,start_date,end_date\n${lat},${lon},${startDate},${endDate}`;
-                const blob = new Blob([csvContent], { type: 'text/csv' });
-                const file = new File([blob], 'single_location.csv', { type: 'text/csv' });
-                
-                processFile(file, option);
-            }
-
             // Process the file and send to server
             function processFile(file, option) {
                 // Hide options and show loading
@@ -946,10 +453,6 @@
                 });
 
                 formData.append('variables', JSON.stringify(selectedVars));
-                
-                // Add region parameter
-                const region = document.getElementById('region-select').value;
-                formData.append('region', region);
 
                 
                 // Send file to server

@@ -19,7 +19,6 @@ async def table_exists(db, table_name: str) -> bool:
 async def get_climate_data_timeseries_logic(
     lat: float,
     lon: float,
-    region: str,  # Add region parameter
     start_date: Optional[str],
     end_date: Optional[str],
     data_source: DataSource,
@@ -28,7 +27,6 @@ async def get_climate_data_timeseries_logic(
 ) -> dict:
     result = {
         "data_source": data_source.value,
-        "region": region,
         "location": {"lat": lat, "lon": lon},
         "cadence": DATA_SOURCE_CADENCE.get(data_source, Cadence.MONTHLY).value,
         "data": []
