@@ -48,7 +48,10 @@ def unpack_yearly_chirps(yearly_file, year):
         # Open the multi-band raster
         with rasterio.open(yearly_file) as src:
             profile = src.profile.copy()
-            profile.update(count=1)  # Single band output
+            profile.update(
+                count=1,  # Single band output
+                nodata=src.nodata  # Preserve NoData value from source
+            )
             
             num_bands = src.count
             print(f"  Total bands (days): {num_bands}")

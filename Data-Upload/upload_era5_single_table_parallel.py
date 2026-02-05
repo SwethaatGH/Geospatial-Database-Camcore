@@ -1,8 +1,8 @@
 """
-Upload ERA5-Land daily multi-band files to PostgreSQL database.
+Upload ERA5-Land daily multi-band files to PostgreSQL database - PARALLEL VERSION
 
-This script processes daily ERA5 files where each file contains 15 bands (one per variable).
-Each band is extracted and uploaded separately with its corresponding variable name.
+This script processes daily ERA5 files using multiple worker processes for faster upload.
+Uses multiprocessing to process multiple files concurrently.
 
 Input: era5land_YYYY-MM-DD.tif files with 15 bands
 Output: era5_data table with (rid, date_id, var_name, rast)
@@ -16,6 +16,8 @@ from pathlib import Path
 import tempfile
 import shutil
 import rasterio
+from multiprocessing import Pool, cpu_count
+from functools import partial
 
 # Configuration
 ERA5_FOLDER = r"Q:\My Drive\Indonesia_ERA5_Daily"
@@ -29,6 +31,11 @@ DB_CONFIG = {
 
 RASTER2PGSQL_PATH = r"C:\Program Files\PostgreSQL\13\bin\raster2pgsql.exe"
 PSQL_PATH = r"C:\Program Files\PostgreSQL\13\bin\psql.exe"
+
+# Number of parallel workers (optimized for 32-core system with 64GB RAM and local files)
+# Files are offline on Google Drive = fast local disk reads
+# Main bottleneck is database writes over SSH tunnel
+NUM_WORKERS = 16  # Aggressive; can try 20 if system handles it well
 
 # Band order from GEE download script → database variable names
 BAND_TO_VARNAME = {
@@ -102,83 +109,6 @@ def extract_band_to_temp_file(input_file, band_num, temp_dir):
     
     return temp_file
 
-def process_file(filepath, conn):
-    """Process one ERA5 daily file - extract all 15 bands and upload."""
-    filename = os.path.basename(filepath)
-    date_id = parse_filename(filename)
-    
-    if not date_id:
-        print(f"✗ Skipping {filename} - cannot parse date")
-        return False
-    
-    print(f"\n→ Processing {filename} ({date_id})")
-    
-    # Check if already uploaded
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT COUNT(DISTINCT var_name) FROM era5_data WHERE date_id = %s",
-            (date_id,)
-        )
-        existing_count = cur.fetchone()[0]
-        
-        if existing_count == 15:
-            print(f"  ⊙ All 15 variables already uploaded")
-            return True
-        elif existing_count > 0:
-            print(f"  ⚠ Found {existing_count}/15 variables, re-uploading all")
-            cur.execute("DELETE FROM era5_data WHERE date_id = %s", (date_id,))
-            conn.commit()
-    
-    # Create temporary directory for band extraction
-    with tempfile.TemporaryDirectory() as temp_dir:
-        try:
-            # Process each band
-            for band_num, var_name in BAND_TO_VARNAME.items():
-                print(f"  [{band_num}/15] Uploading {var_name}...", end=" ", flush=True)
-                
-                # Extract band to temporary file
-                temp_band_file = extract_band_to_temp_file(filepath, band_num, temp_dir)
-                
-                # Generate SQL using raster2pgsql
-                temp_sql_file = os.path.join(temp_dir, f"band_{band_num}.sql")
-                
-                cmd = [
-                    RASTER2PGSQL_PATH,
-                    "-a",  # Append mode
-                    "-s", "4326",  # Set SRID to WGS84
-                    "-t", "100x100",  # Tile size
-                    "-C",  # Add raster constraints
-                    "-N", "NaN",  # Set NoData value to NaN in database
-                    temp_band_file,
-                    "era5_data"
-                ]
-                
-                with open(temp_sql_file, 'w') as f:
-                    result = subprocess.run(cmd, stdout=f, stderr=subprocess.PIPE, text=True)
-                    if result.returncode != 0:
-                        raise Exception(f"raster2pgsql failed: {result.stderr}")
-                
-                # Modify SQL to add date_id and var_name
-                with open(temp_sql_file, 'r') as f:
-                    sql_content = f.read()
-                
-                modified_sql = modify_sql_for_dateid_varname(sql_content, date_id, var_name)
-                
-                # Execute modified SQL
-                with conn.cursor() as cur:
-                    cur.execute(modified_sql)
-                    conn.commit()
-                
-                print("✓")
-            
-            print(f"✓ Completed {filename} - all 15 variables uploaded")
-            return True
-            
-        except Exception as e:
-            print(f"\n✗ Error processing {filename}: {e}")
-            conn.rollback()
-            return False
-
 def modify_sql_for_dateid_varname(sql_content, date_id, var_name):
     """Modify raster2pgsql SQL to include date_id and var_name."""
     lines = sql_content.split('\n')
@@ -198,23 +128,103 @@ def modify_sql_for_dateid_varname(sql_content, date_id, var_name):
                     'INSERT INTO "era5_data" ("date_id","var_name","rast")'
                 )
                 
-                # Modify VALUES clause to include date_id and var_name
-                values_part = values_part.replace(
-                    '(',
-                    f"('{date_id}','{var_name}',",
-                    1
-                )
+                # Modify VALUES clause to include date_id and var_name values
+                values_part = values_part.strip().rstrip(';')
+                if values_part.startswith('('):
+                    values_part = f"('{date_id}','{var_name}'," + values_part[1:]
                 
-                modified_lines.append(insert_part + 'VALUES' + values_part)
+                modified_lines.append(f"{insert_part}VALUES {values_part};")
             else:
                 modified_lines.append(line)
-        elif line.strip().startswith('COPY') or 'FROM stdin' in line:
-            # Skip COPY statements if any
+        elif line.strip().startswith('BEGIN') or line.strip().startswith('END'):
+            # Skip transaction control statements
             continue
         else:
             modified_lines.append(line)
     
     return '\n'.join(modified_lines)
+
+def process_file_worker(filepath):
+    """
+    Worker function to process one file. Each worker has its own database connection.
+    This function is called by multiprocessing Pool workers.
+    """
+    filename = os.path.basename(filepath)
+    date_id = parse_filename(filename)
+    
+    if not date_id:
+        return (filepath, False, f"Cannot parse date from {filename}")
+    
+    # Each worker creates its own connection
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+    except Exception as e:
+        return (filepath, False, f"DB connection failed: {e}")
+    
+    try:
+        # Check if already uploaded
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT COUNT(DISTINCT var_name) FROM era5_data WHERE date_id = %s",
+                (date_id,)
+            )
+            existing_count = cur.fetchone()[0]
+            
+            if existing_count == 15:
+                conn.close()
+                return (filepath, True, f"Already uploaded (15/15 vars)")
+            elif existing_count > 0:
+                cur.execute("DELETE FROM era5_data WHERE date_id = %s", (date_id,))
+                conn.commit()
+        
+        # Create temporary directory for band extraction
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Collect all SQL statements for batch commit
+            all_sql_statements = []
+            
+            # Process each band
+            for band_num, var_name in BAND_TO_VARNAME.items():
+                # Extract band to temporary file
+                temp_band_file = extract_band_to_temp_file(filepath, band_num, temp_dir)
+                
+                # Generate SQL using raster2pgsql
+                temp_sql_file = os.path.join(temp_dir, f"band_{band_num}.sql")
+                
+                cmd = [
+                    RASTER2PGSQL_PATH,
+                    "-a",  # Append mode
+                    "-s", "4326",  # Set SRID to WGS84
+                    "-t", "100x100",  # Tile size
+                    "-N", "NaN",  # Set NoData value to NaN in database
+                    temp_band_file,
+                    "era5_data"
+                ]
+                
+                with open(temp_sql_file, 'w') as f:
+                    result = subprocess.run(cmd, stdout=f, stderr=subprocess.PIPE, text=True)
+                    if result.returncode != 0:
+                        raise Exception(f"raster2pgsql failed: {result.stderr}")
+                
+                # Modify SQL to add date_id and var_name
+                with open(temp_sql_file, 'r') as f:
+                    sql_content = f.read()
+                
+                modified_sql = modify_sql_for_dateid_varname(sql_content, date_id, var_name)
+                all_sql_statements.append(modified_sql)
+            
+            # Execute all SQL statements in a single transaction
+            with conn.cursor() as cur:
+                for sql in all_sql_statements:
+                    cur.execute(sql)
+                conn.commit()  # Single commit for all 15 bands
+        
+        conn.close()
+        return (filepath, True, f"Uploaded all 15 variables")
+        
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return (filepath, False, str(e))
 
 def get_all_files():
     """Get all ERA5 daily files sorted by date."""
@@ -224,11 +234,12 @@ def get_all_files():
 
 def main():
     print("="*70)
-    print("ERA5-Land Daily Data Upload to PostgreSQL")
+    print("ERA5-Land Daily Data Upload to PostgreSQL (PARALLEL)")
     print("="*70)
     print(f"Source folder: {ERA5_FOLDER}")
     print(f"Database: {DB_CONFIG['database']}")
     print(f"Table: era5_data")
+    print(f"Workers: {NUM_WORKERS} parallel processes")
     print("="*70)
     
     # Get all files
@@ -239,34 +250,52 @@ def main():
         print("No files found to process!")
         return
     
-    # Connect to database
+    # Connect to database for table creation
     conn = psycopg2.connect(**DB_CONFIG)
-    
     try:
-        # Create table
         create_table_if_not_exists(conn)
+    finally:
+        conn.close()
+    
+    print(f"\nStarting parallel upload with {NUM_WORKERS} workers...")
+    print(f"Processing {len(files)} files...\n")
+    
+    # Process files in parallel
+    successful = 0
+    failed = 0
+    skipped = 0
+    
+    with Pool(processes=NUM_WORKERS) as pool:
+        # Use imap for progress tracking
+        results = pool.imap(process_file_worker, files)
         
-        # Process each file
-        successful = 0
-        failed = 0
-        
-        for idx, filepath in enumerate(files, 1):
-            print(f"\n[{idx}/{len(files)}]", end=" ")
-            if process_file(filepath, conn):
-                successful += 1
+        for idx, (filepath, success, message) in enumerate(results, 1):
+            filename = os.path.basename(filepath)
+            
+            if success:
+                if "Already uploaded" in message:
+                    print(f"[{idx}/{len(files)}] ⊙ {filename} - {message}")
+                    skipped += 1
+                else:
+                    print(f"[{idx}/{len(files)}] ✓ {filename}")
+                    successful += 1
             else:
+                print(f"[{idx}/{len(files)}] ✗ {filename} - {message}")
                 failed += 1
-        
-        # Summary
-        print("\n" + "="*70)
-        print("UPLOAD COMPLETE")
-        print("="*70)
-        print(f"Total files: {len(files)}")
-        print(f"Successful: {successful}")
-        print(f"Failed: {failed}")
-        print("="*70)
-        
-        # Verify database
+    
+    # Summary
+    print("\n" + "="*70)
+    print("UPLOAD COMPLETE")
+    print("="*70)
+    print(f"Total files: {len(files)}")
+    print(f"Successful: {successful}")
+    print(f"Skipped (already uploaded): {skipped}")
+    print(f"Failed: {failed}")
+    print("="*70)
+    
+    # Verify database
+    conn = psycopg2.connect(**DB_CONFIG)
+    try:
         with conn.cursor() as cur:
             cur.execute("SELECT COUNT(DISTINCT date_id) FROM era5_data")
             date_count = cur.fetchone()[0]
@@ -286,6 +315,12 @@ def main():
         print(f"  Total rows: {total_rows}")
         print(f"  Date range: {date_range[0]} to {date_range[1]}")
         print(f"  Expected rows: {date_count * 15} (dates × 15 variables)")
+        
+        # Add raster constraints after all data is uploaded
+        print(f"\nAdding raster constraints...")
+        cur.execute("SELECT AddRasterConstraints('public'::name, 'era5_data'::name, 'rast'::name);")
+        conn.commit()
+        print(f"✓ Raster constraints added")
         
     finally:
         conn.close()
