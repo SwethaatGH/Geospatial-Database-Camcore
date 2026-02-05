@@ -3,11 +3,17 @@
 1. Make sure you are connected to a University WiFi (or using VPN)
 2. Ensure you have Postgres and POSTGIS Downloaded and added to path. Refer to readme in data upload for steps. 
 3. Establish ssh tunnel to connect to postgis db on Camcore premises. 
-`ssh -L 5433:localhost:5432 user@remote.example.com`  
-4. Create venv
-5. Run `pip install -r .\app\requirementsv1.txt` to your venv
-6. Start dev server: `uvicorn app.main:app --reload` 
-7. To obtain temporary URL use ngrok 
+`ssh -L 5433:localhost:5432 Rcavalh@10.72.74.19`  
+
+On cmd:
+1. cd Api-v1
+<!-- 2. Create venv 'python -m venv venv' -->
+<!-- 3. Run `pip install -r .\app\requirementsv1.txt` to your venv -->
+4. run: `venv\Scripts\activate`
+4. Start dev server: `uvicorn app.main:app --reload` 
+6. URL: `http://127.0.0.1:8000/ui` or URL: `http://127.0.0.1:8000/CSVGenerator` or URL: `http://127.0.0.1:8000/docs`
+7. ctrl c to quit
+8. To obtain temporary URL use ngrok 
 `ngrok http 8000 --domain=stingray-oriented-optionally.ngrok-free.app`
 
 ## Checklist:
