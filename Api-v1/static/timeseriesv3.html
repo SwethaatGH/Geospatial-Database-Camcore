@@ -173,6 +173,11 @@
                     <div class="coordinates" id="selected-point">
                         <p>Click on the map to select a point.</p>
                     </div>
+                    <label for="region-point">Region:</label>
+                    <select id="region-point">
+                        <option value="brazil">Brazil</option>
+                        <option value="indonesia">Indonesia</option>
+                    </select>
                     <label for="data-source-point">Data Source:</label>
                     <select id="data-source-point">
                         <option value="wc">WorldClim</option>
@@ -208,6 +213,11 @@
                     <div class="coordinates" id="selected-bbox">
                         <p>Use the rectangle tool to draw a bounding box on the map.</p>
                     </div>
+                    <label for="region-bbox">Region:</label>
+                    <select id="region-bbox">
+                        <option value="brazil">Brazil</option>
+                        <option value="indonesia">Indonesia</option>
+                    </select>
                     <label for="data-source-bbox">Data Source:</label>
                     <select id="data-source-bbox">
                         <option value="wc">WorldClim</option>
@@ -607,11 +617,12 @@
             // Get form values
             const dataSource = document.getElementById('data-source-point').value;
             const variable = document.getElementById('variable-point').value;
+            const region = document.getElementById('region-point').value;
             // Build API URL base
             let apiUrl = '';
             if (dataSource === 'elev' || dataSource === 'soil' || dataSource === 'bio') {
                 // For static data sources
-                apiUrl = `/climate-data-timeseries/?lat=${selectedPoint.lat}&lon=${selectedPoint.lon}&data_source=${dataSource}&variable=${variable}`;
+                apiUrl = `/climate-data-timeseries/?lat=${selectedPoint.lat}&lon=${selectedPoint.lon}&data_source=${dataSource}&variable=${variable}&region=${region}`;
             } else {
                 // For time series data
                 const startDate = document.getElementById('start-date').value;
@@ -621,7 +632,7 @@
                     showError('Please select start and end dates.');
                     return;
                 }
-                apiUrl = `/climate-data-timeseries/?lat=${selectedPoint.lat}&lon=${selectedPoint.lon}&start_date=${startDate}&end_date=${endDate}&data_source=${dataSource}&variable=${variable}`;
+                apiUrl = `/climate-data-timeseries/?lat=${selectedPoint.lat}&lon=${selectedPoint.lon}&start_date=${startDate}&end_date=${endDate}&data_source=${dataSource}&variable=${variable}&region=${region}`;
 
             }
             // Show loading
@@ -665,6 +676,7 @@
 
             const dataSource = document.getElementById('data-source-bbox').value;
             const variable = document.getElementById('variable-bbox').value;
+            const region = document.getElementById('region-bbox').value;
 
             let apiUrl = '';
             const isTimeSeries = !(dataSource === 'elev' || dataSource === 'soil' || dataSource === 'bio');
@@ -679,9 +691,9 @@
                     return;
                 }
 
-                apiUrl = `/climate-data-timeseries-bbox-sampled/?min_lat=${bboxCoordinates.min_lat}&min_lon=${bboxCoordinates.min_lon}&max_lat=${bboxCoordinates.max_lat}&max_lon=${bboxCoordinates.max_lon}&start_date=${startDate}&end_date=${endDate}&data_source=${dataSource}&variable=${variable}`;
+                apiUrl = `/climate-data-timeseries-bbox-sampled/?min_lat=${bboxCoordinates.min_lat}&min_lon=${bboxCoordinates.min_lon}&max_lat=${bboxCoordinates.max_lat}&max_lon=${bboxCoordinates.max_lon}&start_date=${startDate}&end_date=${endDate}&data_source=${dataSource}&variable=${variable}&region=${region}`;
             } else {
-                apiUrl = `/climate-data-timeseries-bbox-sampled/?min_lat=${bboxCoordinates.min_lat}&min_lon=${bboxCoordinates.min_lon}&max_lat=${bboxCoordinates.max_lat}&max_lon=${bboxCoordinates.max_lon}&data_source=${dataSource}&variable=${variable}`;
+                apiUrl = `/climate-data-timeseries-bbox-sampled/?min_lat=${bboxCoordinates.min_lat}&min_lon=${bboxCoordinates.min_lon}&max_lat=${bboxCoordinates.max_lat}&max_lon=${bboxCoordinates.max_lon}&data_source=${dataSource}&variable=${variable}&region=${region}`;
             }
 
             document.getElementById('loading').style.display = 'block';

@@ -101,6 +101,12 @@
                     <p>Click on the map to select a point.</p>
                 </div>
                 
+                <label for="region">Region:</label>
+                <select id="region">
+                    <option value="brazil">Brazil</option>
+                    <option value="indonesia">Indonesia</option>
+                </select>
+                
                 <label for="data-source">Data Source:</label>
                 <select id="data-source">
                     <option value="wc">WorldClim</option>
@@ -404,13 +410,14 @@
             // Get form values
             const dataSource = document.getElementById('data-source').value;
             const variable = document.getElementById('variable').value;
+            const region = document.getElementById('region').value;
             
             // Build API URL base
             let apiUrl = '';
         
             if (dataSource === 'elev' || dataSource === 'sg') {
                 // For static data sources
-                apiUrl = `/climate-data-timeseries/?lat=${selectedPoint.lat}&lon=${selectedPoint.lon}&data_source=${dataSource}&variable=${variable}`;
+                apiUrl = `/climate-data-timeseries/?lat=${selectedPoint.lat}&lon=${selectedPoint.lon}&data_source=${dataSource}&variable=${variable}&region=${region}`;
                 
                 // For SoilGrids, we don't need dates
                 if (dataSource === 'sg') {
@@ -427,7 +434,7 @@
                     return;
                 }
                 
-                apiUrl = `/climate-data-timeseries/?lat=${selectedPoint.lat}&lon=${selectedPoint.lon}&start_date=${startDate}&end_date=${endDate}&data_source=${dataSource}&variable=${variable}`;
+                apiUrl = `/climate-data-timeseries/?lat=${selectedPoint.lat}&lon=${selectedPoint.lon}&start_date=${startDate}&end_date=${endDate}&data_source=${dataSource}&variable=${variable}&region=${region}`;
             }
             
             // Show loading
@@ -745,13 +752,13 @@
             if (variable === 'prec' || variable === 'chirps' || variable === 'et') {
                 return 'mm';
             } else if (variable === 'tmax' || variable === 'tmin') {
-                return '°C';
+                return 'ï¿½C';
             } else if (variable === 'spei') {
                 return 'Index';
             } else if (variable === 'elev') {
                 return 'm';
             } else if (variable === 'bdod') {
-                return 'kg/dm³';
+                return 'kg/dmï¿½';
             } else if (variable === 'cec') {
                 return 'cmolc/kg';
             } else if (variable === 'cfvo') {
@@ -761,7 +768,7 @@
             } else if (variable === 'nitrogen') {
                 return 'g/kg';
             } else if (variable === 'ocd') {
-                return 'kg/dm³';
+                return 'kg/dmï¿½';
             } else if (variable === 'ocs') {
                 return 't/ha';
             } else if (variable === 'phh2o') {

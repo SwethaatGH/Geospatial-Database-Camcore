@@ -122,7 +122,6 @@ async def query_climate_data(lat, lon, start_date, end_date, data_source, variab
     try:
         result = await get_climate_data_timeseries_logic(
             lat=lat, lon=lon,
-            region=region,
             start_date=start_date, end_date=end_date,
             data_source=DataSource(data_source),
             variable=variable,
