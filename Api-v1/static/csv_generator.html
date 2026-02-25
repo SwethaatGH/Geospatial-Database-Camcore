@@ -467,7 +467,11 @@
 
                 formData.append('variables', JSON.stringify(selectedVars));
 
-                
+                // Get selected region
+                const regionRadio = document.querySelector('input[name="region"]:checked');
+                const region = regionRadio ? regionRadio.value : 'brazil';
+                formData.append('region', region);
+
                 // Send file to server
                 fetch('/api/process-csv', {
                     method: 'POST',
