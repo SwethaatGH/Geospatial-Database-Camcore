@@ -168,6 +168,7 @@ async def process_csv(
     file: UploadFile = File(...),
     option: str = Form(...),
     variables: Optional[str] = Form(None),
+    region: str = Form("brazil"),
 ):
     job_id = str(uuid.uuid4())
     upload_dir = Path(f"../Csv-Creator/uploads/{job_id}")
@@ -195,7 +196,8 @@ async def process_csv(
                 "--default-start-date", "2000-01-01",
                 "--default-end-date", "2000-12-31",
                 "--cache-file", f"{processed_dir}/cache.json",
-                "--vars", variables 
+                "--vars", variables,
+                "--region", region  # region is now passed separately (brazil/indonesia)
             ], check=True)
         else:
             # Run script_raw.py (which does batching and merging, but not covariates)

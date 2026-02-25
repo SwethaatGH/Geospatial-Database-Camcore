@@ -811,74 +811,103 @@ def extract_monthly_covariates(df: pd.DataFrame, source: str, variables: list, p
 
 
 def main():
+    import logging
+    import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input', default="forest_data_with_climate.csv")
-    parser.add_argument('--output', default="forest_data_with_covariates.csv")
+    parser.add_argument('--input', required=True)
+    parser.add_argument('--output', required=True)
+    parser.add_argument('--sources', nargs='+', default=None)
     args = parser.parse_args()
 
+    log_file = "debug_covariables.log"
+    logging.basicConfig(filename=log_file, level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
+    def log(msg):
+        print(msg)
+        logging.debug(msg)
+
+    log(f"[DEBUG] Starting covariablesv3.py with input: {args.input}, output: {args.output}, sources: {args.sources}")
     try:
         df = pd.read_csv(args.input)
-        print(f"Loaded input CSV with {len(df)} rows.")
+        log(f"Loaded input CSV with {len(df)} rows. Columns: {list(df.columns)}")
     except Exception as e:
-        print(f"Failed to load input CSV: {e}")
+        log(f"Failed to load input CSV: {e}")
         return
-    
-    # Check if 'id' column exists, if not create it
+
     if 'id' not in df.columns:
         df['id'] = range(len(df))
-    
-        # --- Extract static elev_ and soil_ columns ---
+        log("[DEBUG] 'id' column not found. Created new 'id' column.")
+
     static_cols = ['id', 'latitude', 'longitude'] + [col for col in df.columns if col.startswith("elev_") or col.startswith("soil_") or col.startswith("bio_") or col.startswith("koppen_")]
     static_df = df[static_cols].drop_duplicates(subset=["id", "latitude", "longitude"])
+    log(f"[DEBUG] Static columns extracted: {static_cols}")
 
-    chirps_df = extract_chirps_covariates_from_daily_columns(df)
-    et_df = extract_et_covariates(df)
-    wc_df = extract_monthly_covariates(df, 'wc', ["prec", "tmax", "tmin"], 'WC')
-    spei_df = extract_monthly_covariates(df, 'spei', ["spei"], 'SPEI')
-    tc_df = extract_monthly_covariates(df, 'tc', ["aet", "def", "pdsi", "pet", "ppt", "q", "soil", "srad", "tmin", "tmax", "vap", "vpd", "ws"], 'TC')
-    np_df = extract_monthly_covariates(df, 'np', ["airmass", "allsky_kt", "allsky_nkt", "allsky_sfc_lw_dwn", "allsky_sfc_lw_up", "allsky_sfc_par_diff",
-           "allsky_sfc_par_dirh", "allsky_sfc_par_tot", "allsky_sfc_sw_diff", "allsky_sfc_sw_dirh", "allsky_sfc_sw_dni",
-           "allsky_sfc_sw_dwn", "allsky_sfc_sw_up", "allsky_sfc_uv_index", "allsky_sfc_uva", "allsky_sfc_uvb",
-           "allsky_srf_alb", "midday_insol", "original_allsky_sfc_sw_diff", "original_allsky_sfc_sw_dirh", "psh", "pw",
-           "srf_alb_adj", "toa_sw_dni", "toa_sw_dwn", "ts_adj"], 'NP')
-    era5_p_df = extract_totprec(df, re.compile(r"era5_totprec_(\d{4})-(\d{2})-(\d{2})"), "ERA5_prec_")
-    brazil_p_df = extract_totprec(df, re.compile(r"brazil_pr_(\d{4})-(\d{2})-(\d{2})"), "Brazil_pr_")
-    era5_rest_df = extract_era5_covariates(df)
-    brazil_rest_df = extract_brazil_covariates(df)
-    era5_quartile = extract_era5_temp_precip_covariates(df)
-    brazil_quartile = extract_brazil_temp_precip_covariates(df)
-    SolarRad = compute_solar_radiation_from_wc_range(df)
-    bio_df = extract_biovars_from_tc_and_chirps(df)
+    source_funcs = {
+        'chirps': lambda: extract_chirps_covariates_from_daily_columns(df),
+        'et': lambda: extract_et_covariates(df),
+        'wc': lambda: extract_monthly_covariates(df, 'wc', ["prec", "tmax", "tmin"], 'WC'),
+        'spei': lambda: extract_monthly_covariates(df, 'spei', ["spei"], 'SPEI'),
+        'tc': lambda: extract_monthly_covariates(df, 'tc', ["aet", "def", "pdsi", "pet", "ppt", "q", "soil", "srad", "tmin", "tmax", "vap", "vpd", "ws"], 'TC'),
+        'np': lambda: extract_monthly_covariates(df, 'np', ["airmass", "allsky_kt", "allsky_nkt", "allsky_sfc_lw_dwn", "allsky_sfc_lw_up", "allsky_sfc_par_diff",
+               "allsky_sfc_par_dirh", "allsky_sfc_par_tot", "allsky_sfc_sw_diff", "allsky_sfc_sw_dirh", "allsky_sfc_sw_dni",
+               "allsky_sfc_sw_dwn", "allsky_sfc_sw_up", "allsky_sfc_uv_index", "allsky_sfc_uva", "allsky_sfc_uvb",
+               "allsky_srf_alb", "midday_insol", "original_allsky_sfc_sw_diff", "original_allsky_sfc_sw_dirh", "psh", "pw",
+               "srf_alb_adj", "toa_sw_dni", "toa_sw_dwn", "ts_adj"], 'NP'),
+        'era5': lambda: extract_era5_covariates(df),
+        'era5_prec': lambda: extract_totprec(df, re.compile(r"era5_totprec_(\d{4})-(\d{2})-(\d{2})"), "ERA5_prec_"),
+        'brazil': lambda: extract_brazil_covariates(df),
+        'brazil_prec': lambda: extract_totprec(df, re.compile(r"brazil_pr_(\d{4})-(\d{2})-(\d{2})"), "Brazil_pr_"),
+        'era5_quartile': lambda: extract_era5_temp_precip_covariates(df),
+        'brazil_quartile': lambda: extract_brazil_temp_precip_covariates(df),
+        'solar': lambda: compute_solar_radiation_from_wc_range(df),
+        'bio': lambda: extract_biovars_from_tc_and_chirps(df)
+    }
 
-    dynamic_dfs = [chirps_df, et_df, wc_df, spei_df, tc_df, np_df, era5_p_df, era5_rest_df, era5_quartile, brazil_p_df, brazil_rest_df, brazil_quartile, SolarRad, bio_df]
-    for i, d in enumerate(dynamic_dfs):
-        if d is not None and not d.empty:
-            dynamic_dfs[i] = d.groupby(['id', 'latitude', 'longitude', 'year']).first().reset_index()
+    if args.sources is None:
+        selected_sources = ['chirps', 'et', 'wc', 'spei', 'tc', 'np', 'era5_prec', 'era5', 'era5_quartile', 'brazil_prec', 'brazil', 'brazil_quartile', 'solar', 'bio']
+    else:
+        selected_sources = args.sources
+
+    log(f"[DEBUG] Selected sources: {selected_sources}")
+    dynamic_dfs = []
+    for src in selected_sources:
+        func = source_funcs.get(src)
+        if func:
+            log(f"[DEBUG] Extracting covariates for source: {src}")
+            df_cov = func()
+            if df_cov is not None and not df_cov.empty:
+                log(f"[DEBUG] Covariates extracted for {src}: shape {df_cov.shape}, columns: {list(df_cov.columns)}")
+                dynamic_dfs.append(df_cov.groupby(['id', 'latitude', 'longitude', 'year']).first().reset_index())
+            else:
+                log(f"[DEBUG] No covariates found for {src}.")
+        else:
+            log(f"Source '{src}' not recognized. Skipping.")
 
     from functools import reduce
-    dynamic_dfs_valid = [d for d in dynamic_dfs if not d.empty]
-    if dynamic_dfs_valid:
+    if dynamic_dfs:
+        log(f"[DEBUG] Merging {len(dynamic_dfs)} dynamic covariate DataFrames.")
         merged_df = reduce(
             lambda left, right: pd.merge(left, right, on=['id', 'latitude', 'longitude', 'year'], how='outer'),
-            dynamic_dfs_valid
+            dynamic_dfs
         )
     else:
-        merged_df = pd.DataFrame() 
+        log(f"[DEBUG] No dynamic covariate DataFrames to merge.")
+        merged_df = pd.DataFrame()
 
-    # Merge static columns after
     if not static_df.empty and not merged_df.empty:
+        log(f"[DEBUG] Merging static columns into merged covariate DataFrame.")
         merged_df = pd.merge(merged_df, static_df, on=['id', 'latitude', 'longitude'], how='left')
 
     if merged_df is not None and not merged_df.empty:
+        log(f"[DEBUG] Final merged DataFrame shape: {merged_df.shape}, columns: {list(merged_df.columns)}")
         for col in merged_df.columns:
             if col.startswith(('WC_', 'SPEI_', 'TC_', 'NP_')):
                 merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce')
                 merged_df[col] = merged_df[col].apply(lambda x: pd.NA if isinstance(x, int) and x == 0 else x)
 
         merged_df.to_csv(args.output, index=False)
-        print(f"✅ Saved merged seasonal covariates to {args.output}")
+        log(f"✅ Saved merged seasonal covariates to {args.output}")
     else:
-        print("⚠️ No covariates were generated. Output not saved.")
+        log("⚠️ No covariates were generated. Output not saved.")
 
 if __name__ == "__main__":
     main()

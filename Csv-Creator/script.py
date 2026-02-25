@@ -20,7 +20,6 @@ else:
 if os.path.exists(site_packages):
     sys.path.insert(0, site_packages)
 
-os.makedirs('batches', exist_ok=True)
 
 # Add API source path
 api_v1_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Api-v1"))
@@ -110,10 +109,12 @@ async def query_climate_data(lat, lon, start_date, end_date, data_source, variab
         ','.join(variable) if isinstance(variable, list) else str(variable)
         if variable is not None else "None"
     )
-
     cache_key = f"{lat}_{lon}_{start_date}_{end_date}_{data_source}_{variable_key}_{region}"
     cache_hash = hashlib.md5(cache_key.encode()).hexdigest()
+    import logging
+    logging.debug(f"[DEBUG] query_climate_data: lat={lat}, lon={lon}, start_date={start_date}, end_date={end_date}, data_source={data_source}, variable={variable}, region={region}")
     if cache and cache_hash in cache:
+        logging.debug(f"[DEBUG] query_climate_data: cache hit for key {cache_key}")
         return cache[cache_hash]
 
     db_gen = get_db(region=region)
@@ -126,6 +127,10 @@ async def query_climate_data(lat, lon, start_date, end_date, data_source, variab
             variable=variable,
             db=db
         )
+        logging.debug(f"[DEBUG] query_climate_data: result for lat={lat}, lon={lon}, source={data_source}: {result}")
+    except Exception as e:
+        logging.error(f"[ERROR] query_climate_data: Exception for lat={lat}, lon={lon}, source={data_source}: {e}")
+        result = None
     finally:
         await db_gen.aclose()
 
@@ -165,41 +170,35 @@ async def process_one_row(
     async with semaphore:
         lat = row['latitude']
         lon = row['longitude']
-
         start_date = construct_date(row, "start")
         end_date = construct_date(row, "end")
-
         row_updates = {}
-
-        # GROUP selected variables by data source
+        import logging
+        logging.debug(f"[DEBUG] process_one_row: index={index}, lat={lat}, lon={lon}, start_date={start_date}, end_date={end_date}")
         vars_by_source = group_selected_vars_by_source(selected_set)
-
         for source, variables in vars_by_source.items():
-            # Pass all variables for the source in a single call
+            logging.debug(f"[DEBUG] process_one_row: querying source={source}, variables={variables}")
             data = await query_climate_data(
                 lat, lon, start_date, end_date, source, variables, cache, region
             )
+            logging.debug(f"[DEBUG] process_one_row: result for source={source}: {data}")
             if not data or 'data' not in data:
-                print(f"⚠️ No data returned for {source} at ({lat}, {lon}): {data.get('error', 'Unknown error') if data else 'No response'}")
+                logging.debug(f"[DEBUG] process_one_row: no data for source={source}, index={index}")
                 continue
-
             for entry in data['data']:
                 if source in STATIC_SOURCES:
-                    # Static: one value per variable
                     key = f"{source}_{entry['variable']}"
                     row_updates[key] = entry['value']
                 else:
-                    # Time series: values per date
                     date_str = entry.get("date") or f"{entry['year']}-{entry['month']:02d}"
                     for v, val in entry.get("values", {}).items():
                         key = f"{source}_{v}_{date_str}"
-                        # Convert ERA5 units if needed
                         if source == "era5" and v in {"sktemp", "sotemp1", "sotemp2", "sotemp3", "temp"}:
                             val = val - 273.15
                         if source == 'era5' and v in {"totprec"}:
                             val = val * 1000
                         row_updates[key] = val
-
+        logging.debug(f"[DEBUG] process_one_row: row_updates for row index={index}, lat={lat}, lon={lon}: {row_updates}")
         return (index, row_updates)
 
 async def process_csv_file(
@@ -217,8 +216,18 @@ async def process_csv_file(
 
 ):
     import math
+    import logging
+    log_file = "debug_script.log"
+    logging.basicConfig(filename=log_file, level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
+    def log(msg):
+        print(msg)
+        logging.debug(msg)
+
+    log(f"[DEBUG] Loading cache from {cache_file_path}")
     cache = load_cache(cache_file_path)
+    log(f"[DEBUG] Reading input CSV from {input_csv_path}")
     df = pd.read_csv(input_csv_path)
+    log(f"[DEBUG] Input CSV shape: {df.shape}")
     results_df = df.copy()
     semaphore = asyncio.Semaphore(max_concurrent)
 
@@ -226,10 +235,15 @@ async def process_csv_file(
     batch_indices = []
     batch_number = 0
 
-    batch_dir = os.path.dirname(checkpoint_prefix)
+    # Ensure batch and covariate files are saved in the same directory as output_csv_path
+    processed_dir = os.path.dirname(os.path.abspath(output_csv_path))
+    batch_dir = os.path.join(processed_dir, "batches")
     if os.path.exists(batch_dir):
+        log(f"[DEBUG] Removing existing batch directory: {batch_dir}")
         shutil.rmtree(batch_dir)
     os.makedirs(batch_dir, exist_ok=True)
+    checkpoint_prefix = os.path.join(batch_dir, "results_batch_")
+    covariate_prefix = os.path.join(batch_dir, "covariates_batch_")
 
     tasks = [
         process_one_row(
@@ -244,6 +258,7 @@ async def process_csv_file(
     ]
 
     updates = []
+
     for i, f in enumerate(tqdm(asyncio.as_completed(tasks), total=len(tasks), desc="Processing rows")):
         result = await f
         updates.append(result)
@@ -259,24 +274,34 @@ async def process_csv_file(
                 updates_dicts.append(row_updates)
             updates_df = pd.DataFrame(updates_dicts, index=indices)
             file_name = f"{checkpoint_prefix}{batch_number}.csv"
-            # Only output the batch
             batch_df = pd.concat([results_df.iloc[indices], updates_df], axis=1)
             batch_df = batch_df.copy()
             batch_df.to_csv(file_name, index=False)
-            print(f"✅ Saved checkpoint {file_name} ({i+1} rows)")
+            log(f"✅ Saved checkpoint {file_name} ({i+1} rows)")
 
             cov_file = file_name.replace("results_batch_", "covariates_batch_")
-            subprocess.run([
-                sys.executable, "../Csv-Creator/covariablesv3.py",
-                "--input", file_name,
-                "--output", cov_file
-            ], check=True)
+            selected_sources = set([k.split(':')[0] for k in selected_set]) if selected_set else set()
+            if selected_sources:
+                sources_args = ["--sources"] + list(selected_sources)
+            else:
+                sources_args = []
+            log(f"[DEBUG] Calling covariablesv3.py for batch {batch_number}: {cov_file} with sources {selected_sources}")
+            try:
+                subprocess.run([
+                    sys.executable, "../Csv-Creator/covariablesv3.py",
+                    "--input", file_name,
+                    "--output", cov_file
+                ] + sources_args, check=True)
+                log(f"[DEBUG] covariablesv3.py completed for {cov_file}")
+            except Exception as e:
+                log(f"[ERROR] covariablesv3.py failed for {cov_file}: {e}")
 
             batch_updates = []
             batch_indices = []
             batch_number += 1
 
     # Write any remaining rows
+
     if batch_updates:
         indices = []
         updates_dicts = []
@@ -288,31 +313,51 @@ async def process_csv_file(
         batch_df = pd.concat([results_df.iloc[indices], updates_df], axis=1)
         batch_df = batch_df.copy()
         batch_df.to_csv(file_name, index=False)
-        print(f"✅ Saved checkpoint {file_name} (final batch)")
+        log(f"✅ Saved checkpoint {file_name} (final batch)")
 
         cov_file = file_name.replace("results_batch_", "covariates_batch_")
-        subprocess.run([
-            sys.executable, "../Csv-Creator/covariablesv3.py",
-            "--input", file_name,
-            "--output", cov_file
-        ], check=True)
+        selected_sources = set([k.split(':')[0] for k in selected_set]) if selected_set else set()
+        if selected_sources:
+            sources_args = ["--sources"] + list(selected_sources)
+        else:
+            sources_args = []
+        log(f"[DEBUG] Calling covariablesv3.py for final batch: {cov_file} with sources {selected_sources}")
+        try:
+            subprocess.run([
+                sys.executable, "../Csv-Creator/covariablesv3.py",
+                "--input", file_name,
+                "--output", cov_file
+            ] + sources_args, check=True)
+            log(f"[DEBUG] covariablesv3.py completed for {cov_file}")
+        except Exception as e:
+            log(f"[ERROR] covariablesv3.py failed for {cov_file}: {e}")
+
+    # --- DEBUG: Save merged DataFrame before covariate generation ---
+    try:
+        debug_merged = pd.concat([results_df, updates_df], axis=1)
+        debug_merged.to_csv("debug_intermediate.csv", index=False)
+        log("✅ Saved debug intermediate DataFrame to debug_intermediate.csv")
+    except Exception as e:
+        log(f"⚠️ Failed to save debug intermediate DataFrame: {e}")
 
 
     batch_pattern = f"{covariate_prefix}*.csv" if covariate_prefix.endswith('_') else f"{covariate_prefix}_*.csv"
+    log(f"[DEBUG] Looking for covariate batch files with pattern: {batch_pattern}")
     batch_files = sorted(
         glob.glob(batch_pattern),
         key=lambda x: int(x.split('_')[-1].split('.')[0])
     )
-    
+    log(f"[DEBUG] Found covariate batch files: {batch_files}")
     if batch_files:
         merged_df = pd.concat([pd.read_csv(f) for f in batch_files], ignore_index=True)
         merged_df.to_csv(output_csv_path, index=False)
-        print(f"✅ Merged all covariate files to {output_csv_path}")
+        log(f"✅ Merged all covariate files to {output_csv_path}")
     else:
-        print(f"⚠️ No covariate batch files found. Skipping merge.")
+        log(f"⚠️ No covariate batch files found. Skipping merge.")
 
     raw_batch_pattern = f"{checkpoint_prefix}*.csv"
     zip_output = output_csv_path.replace("covariates_", "raw_data_").replace(".csv", "_batches.zip")
+    log(f"[DEBUG] Zipping raw batch files with pattern: {raw_batch_pattern} to {zip_output}")
     zip_batches(raw_batch_pattern, zip_output)
 
 
@@ -324,9 +369,14 @@ async def main():
     parser.add_argument('--default-start-date', default="2000-01-01")
     parser.add_argument('--default-end-date', default="2000-12-31")
     parser.add_argument('--cache-file', default="climate_data_cache.json")
-    parser.add_argument('--vars', default="[]")
+    parser.add_argument('--vars', default='["chirps:chirps","tc:ppt"]')
     parser.add_argument('--region', default="brazil")
     args = parser.parse_args()
+
+    import logging
+    logging.basicConfig(filename="debug_script.log", level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
+    logging.info(f"[DEBUG] script.py started with region argument: {args.region}")
+    print(f"[DEBUG] script.py started with region argument: {args.region}")
 
     selected_pairs = json.loads(args.vars)
     selected_set = set(selected_pairs)
