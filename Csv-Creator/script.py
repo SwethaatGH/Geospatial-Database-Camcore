@@ -227,6 +227,7 @@ async def process_csv_file(
     cache = load_cache(cache_file_path)
     log(f"[DEBUG] Reading input CSV from {input_csv_path}")
     df = pd.read_csv(input_csv_path)
+    df = df.reset_index(drop=True)
     log(f"[DEBUG] Input CSV shape: {df.shape}")
     results_df = df.copy()
     semaphore = asyncio.Semaphore(max_concurrent)
@@ -274,7 +275,7 @@ async def process_csv_file(
                 updates_dicts.append(row_updates)
             updates_df = pd.DataFrame(updates_dicts, index=indices)
             file_name = f"{checkpoint_prefix}{batch_number}.csv"
-            batch_df = pd.concat([results_df.iloc[indices], updates_df], axis=1)
+            batch_df = pd.concat([results_df.loc[indices], updates_df], axis=1)
             batch_df = batch_df.copy()
             batch_df.to_csv(file_name, index=False)
             log(f"✅ Saved checkpoint {file_name} ({i+1} rows)")
@@ -310,7 +311,7 @@ async def process_csv_file(
             updates_dicts.append(row_updates)
         updates_df = pd.DataFrame(updates_dicts, index=indices)
         file_name = f"{checkpoint_prefix}{batch_number}.csv"
-        batch_df = pd.concat([results_df.iloc[indices], updates_df], axis=1)
+        batch_df = pd.concat([results_df.loc[indices], updates_df], axis=1)
         batch_df = batch_df.copy()
         batch_df.to_csv(file_name, index=False)
         log(f"✅ Saved checkpoint {file_name} (final batch)")
