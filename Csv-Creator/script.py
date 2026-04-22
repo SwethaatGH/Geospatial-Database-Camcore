@@ -226,7 +226,7 @@ async def process_csv_file(
     log(f"[DEBUG] Loading cache from {cache_file_path}")
     cache = load_cache(cache_file_path)
     log(f"[DEBUG] Reading input CSV from {input_csv_path}")
-    df = pd.read_csv(input_csv_path)
+    df = pd.read_csv(input_csv_path, index_col=False)
     df = df.reset_index(drop=True)
     log(f"[DEBUG] Input CSV shape: {df.shape}")
     results_df = df.copy()

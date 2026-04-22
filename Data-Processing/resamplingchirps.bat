@@ -34,7 +34,7 @@ for %%f in ("%INPUT_DIR%\CHIRPS_*.tif") do (
         echo Processing: !FILENAME! -^> !NEW_FILENAME!
         
         rem Run gdalwarp to resample the raster to 0.02 degrees and save in the output directory
-        gdalwarp -tr 0.02 0.02 -r bilinear -co "COMPRESS=LZW" -co "TILED=YES" -ot Float32 -dstnodata -9999.0 "%%f" "%OUTPUT_DIR%\!NEW_FILENAME!"
+        gdalwarp -tr 0.02 0.02 -r bilinear -co "COMPRESS=LZW" -co "TILED=YES" -ot Float32 -srcnodata -9999.0 -dstnodata -9999.0 "%%f" "%OUTPUT_DIR%\!NEW_FILENAME!"
         
         rem Print the completion message for this file
         echo Resampling of "!NEW_FILENAME!" complete.
