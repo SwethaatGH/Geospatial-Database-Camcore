@@ -45,8 +45,8 @@ BAND_TO_VARNAME = {
     4: "sotemp2",            # soil_temperature_level_2
     5: "sotemp3",            # soil_temperature_level_3
     6: "volsowat1",          # volumetric_soil_water_layer_1
-    7: "volsowat12",         # volumetric_soil_water_layer_2
-    8: "volsowat13",         # volumetric_soil_water_layer_3
+    7: "volsowat2",         # volumetric_soil_water_layer_2
+    8: "volsowat3",         # volumetric_soil_water_layer_3
     9: "uwind",              # u_component_of_wind_10m
     10: "vwind",             # v_component_of_wind_10m
     11: "press",             # surface_pressure
